@@ -1,119 +1,153 @@
-let socket = new WebSocket('ws://localhost:8080/ws');
+let socket = null;
 let currentUsername = '';
+let token = null;
 
 const messagesDiv = document.getElementById('messages');
 const form = document.getElementById('chat-form');
 const input = document.getElementById('message-input');
-const usernameOverlay = document.getElementById('username-overlay');
-const usernameInput = document.getElementById('username-input');
-const enterBtn = document.getElementById('enter-btn');
 
-// Disable chat form until username is entered
-form.style.pointerEvents = 'none';
-form.style.opacity = '0.5';
-
-// Username handling
-function handleUsernameEnter() {
-  const username = usernameInput.value.trim();
-  if (username.length >= 2) {
-    currentUsername = username;
-    usernameOverlay.classList.add('hidden');
-    enableChat();
-    input.focus();
-
-    // Add chat-ready class to fade in chat interface
-    document.getElementById('chat-container').classList.add('chat-ready');
-
-    // Send message to parent window (if in iframe)
-    if (window.parent !== window) {
-      try {
-        window.parent.postMessage(
-          JSON.stringify({
-            event: 'username_entered',
-            username: username,
-          }),
-          '*'
-        );
-      } catch (e) {
-        console.log('Could not send message to parent window');
-      }
-    }
-
-    // Add welcome message
-    const welcomeMsg = document.createElement('div');
-    welcomeMsg.className = 'message bot';
-    welcomeMsg.innerHTML = `
-            <span class="user-name">System</span>
-            <span class="message-text">Welcome, ${username}! You can now start chatting.</span>
-        `;
-    messagesDiv.appendChild(welcomeMsg);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  } else {
-    usernameInput.style.borderColor = 'rgba(255, 100, 100, 0.8)';
-    usernameInput.style.boxShadow = '0 0 15px rgba(255, 100, 100, 0.3)';
-    setTimeout(() => {
-      usernameInput.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-      usernameInput.style.boxShadow = 'none';
-    }, 2000);
-  }
-}
-
-enterBtn.addEventListener('click', handleUsernameEnter);
-
-usernameInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    handleUsernameEnter();
-  }
-});
-
-// Enable chat form when username is entered
+// Enable chat form
 function enableChat() {
   form.style.pointerEvents = 'auto';
   form.style.opacity = '1';
 }
 
-socket.addEventListener('message', (event) => {
+// Decode JWT
+function parseJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(
+    decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+  );
+}
+
+function getTokenFromCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
+// Login and connect WebSocket
+const connectingOverlay = document.getElementById('connecting-overlay');
+
+async function loginAndConnect(username, password) {
   try {
-    const jsonData = JSON.parse(event.data);
+    connectingOverlay.classList.remove('hidden');
 
-    if (jsonData.event === 'chat_message') {
-      const { user, message } = jsonData.data;
+    const response = await fetch('http://localhost:8080/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username, password }),
+    });
 
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${user}`;
+    if (!response.ok) throw new Error('Login failed');
 
-      const userSpan = document.createElement('span');
-      userSpan.className = 'user-name';
-      userSpan.textContent = user;
-      userSpan.style.fontWeight = 'bold';
-      userSpan.style.fontSize = '12px';
-      userSpan.style.opacity = '0.8';
-      userSpan.style.marginBottom = '4px';
-      userSpan.style.display = 'block';
+    const data = await response.json();
+    token = data.access_token;
+    localStorage.setItem('token', token);
 
-      const messageSpan = document.createElement('span');
-      messageSpan.className = 'message-text';
-      messageSpan.textContent = message;
+    const payload = parseJwt(token);
+    currentUsername = payload.sub;
 
-      msgDiv.appendChild(userSpan);
-      msgDiv.appendChild(messageSpan);
+    socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
 
-      messagesDiv.appendChild(msgDiv);
+    socket.addEventListener('open', () => {
+      console.log('Socket connected!');
+      setupSocketListeners();
+      connectingOverlay.classList.add('hidden'); // Hide overlay
+      enableChat();
+    });
+
+    socket.addEventListener('error', (e) => {
+      console.error('WebSocket error:', e);
+      connectingOverlay.innerHTML = `<div class="username-form"><h2>Connection failed. Try again.</h2></div>`;
+    });
+  } catch (err) {
+    console.error(err);
+    alert('Login failed');
+    connectingOverlay.innerHTML = `<div class="username-form"><h2>Login failed</h2></div>`;
+  }
+}
+
+// WebSocket event handlers
+function setupSocketListeners() {
+  socket.addEventListener('message', (event) => {
+    try {
+      const jsonData = JSON.parse(event.data);
+
+      if (jsonData.event === 'chat_message') {
+        const { user, message } = jsonData.data;
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${user}`;
+
+        const userSpan = document.createElement('span');
+        userSpan.className = 'user-name';
+        userSpan.textContent = user;
+
+        const messageSpan = document.createElement('span');
+        messageSpan.className = 'message-text';
+        messageSpan.textContent = message;
+
+        msgDiv.appendChild(userSpan);
+        msgDiv.appendChild(messageSpan);
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    } catch (error) {
+      const fallback = document.createElement('div');
+      fallback.className = 'message bot';
+      fallback.textContent = event.data;
+      messagesDiv.appendChild(fallback);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
-  } catch (error) {
-    console.error('Error parsing message:', error);
-    // Fallback for non-JSON messages
-    const msg = document.createElement('div');
-    msg.className = 'message bot';
-    msg.textContent = event.data;
-    messagesDiv.appendChild(msg);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  token = getTokenFromCookie('access_token');
+  if (!token) {
+    window.location.href = '/login';
+    return;
   }
+
+  try {
+    const payload = parseJwt(token);
+    currentUsername = payload.sub;
+  } catch (err) {
+    console.error('Invalid token');
+    window.location.href = '/login';
+    return;
+  }
+
+  connectingOverlay?.classList.remove('hidden');
+  socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+
+  socket.addEventListener('open', () => {
+    console.log('Socket connected!');
+    setupSocketListeners();
+    enableChat();
+    connectingOverlay?.classList.add('hidden');
+  });
+
+  socket.addEventListener('error', (e) => {
+    console.error('WebSocket error:', e);
+    connectingOverlay.innerHTML = `<div class="username-form"><h2>Connection failed. Try again.</h2></div>`;
+  });
 });
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn('Socket is not connected.');
+    return;
+  }
+
   if (input.value.trim() !== '' && currentUsername) {
     const message = {
       event: 'chat_message',
@@ -125,4 +159,11 @@ form.addEventListener('submit', (e) => {
     socket.send(JSON.stringify(message));
     input.value = '';
   }
+});
+
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  localStorage.removeItem('token');             // Clear token
+  document.cookie = 'access_token=; Max-Age=0'; // Optional: clear cookie too
+  window.location.href = '/login';              // Redirect to login
 });

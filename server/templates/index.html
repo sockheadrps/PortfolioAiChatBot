@@ -6,26 +6,28 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <div id="chat-container">
-      <div class="glass-overlay" id="username-overlay">
-        <div class="username-form">
-          <h2>Enter Your Username</h2>
+    <div id="connecting-overlay" class="glass-overlay connecting-overlay">
+      <div class="username-form">
+        <h2>Connecting to server...</h2>
+      </div>
+    </div>
+    <div class="logout-container">
+      <button id="logout-btn">Logout</button>
+    </div>
+
+    <div class="main-container">
+      <div id="chat-container">
+        <div id="messages"></div>
+        <form id="chat-form">
           <input
             type="text"
-            id="username-input"
-            class="username-input"
-            placeholder="Type your username..."
+            id="message-input"
+            placeholder="Type a message..."
             autocomplete="off"
-            maxlength="20"
           />
-          <button type="button" class="enter-btn" id="enter-btn">Enter Chat</button>
-        </div>
+          <button type="submit">Send</button>
+        </form>
       </div>
-      <div id="messages"></div>
-      <form id="chat-form">
-        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" />
-        <button type="submit">Send</button>
-      </form>
     </div>
 
     <script src="/static/scripts.js"></script>
