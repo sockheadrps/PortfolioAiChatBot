@@ -3,6 +3,7 @@ from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from server.db.dbmodels import User
+from server.auth.hash import hash_password
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
@@ -20,22 +21,22 @@ def get_user_by_username(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
 
 def authenticate_user(db: Session, username: str, password: str):
-    user = get_user_by_username(db, username)
-    if not user or not verify_password(password, user.hashed_password):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return None
+    if not verify_password(password, user.password):
         return None
     return user
 
 def register_user(db: Session, username: str, password: str):
-    if get_user_by_username(db, username):
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
         return None
-    new_user = User(
-        username=username,
-        hashed_password=get_password_hash(password)
-    )
-    db.add(new_user)
+    user = User(username=username, password=hash_password(password))
+    db.add(user)
     db.commit()
-    db.refresh(new_user)
-    return new_user
+    db.refresh(user)
+    return user
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
