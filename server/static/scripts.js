@@ -318,7 +318,7 @@ const socketHandlers = {
 
 // WebSocket setup
 function setupSocket() {
-  socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+  socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
 
   socket.addEventListener('open', () => {
     elements.form.style.pointerEvents = 'auto';
@@ -443,6 +443,12 @@ function openPrivateChat(user) {
   elements.privateChatContainer.classList.remove('hidden');
   elements.privateChatContainer.dataset.user = user;
 
+  // Update the chat header with the user's name
+  const chatUserName = document.getElementById('chat-user-name');
+  if (chatUserName) {
+    chatUserName.textContent = `with ${user}`;
+  }
+
   elements.privateChatMinimize.style.display = 'inline-block';
   elements.privateChatDisconnect.style.display = 'inline-block';
   elements.privateChatClose.style.display = 'inline-block';
@@ -505,6 +511,12 @@ function closePrivateChat() {
   elements.privateChatBox.innerHTML = '';
   delete elements.privateChatContainer.dataset.user;
 
+  // Clear the username from header
+  const chatUserName = document.getElementById('chat-user-name');
+  if (chatUserName) {
+    chatUserName.textContent = '';
+  }
+
   // If the user was marked as disconnected, remove the tab entirely
   const tab = document.getElementById(`pm-tab-${user}`);
   if (tab?.classList.contains('disconnected')) {
@@ -516,6 +528,12 @@ function closePrivateChat() {
 
 function minimizePrivateChat() {
   elements.privateChatContainer.classList.add('hidden');
+
+  // Clear the username from header when minimized
+  const chatUserName = document.getElementById('chat-user-name');
+  if (chatUserName) {
+    chatUserName.textContent = '';
+  }
 }
 
 function setPrivateChatEnabled(enabled) {
@@ -650,6 +668,12 @@ function ensurePmFooterTab(chatId, userName, status) {
 function switchToPmChat(user) {
   currentPmUser = user;
   elements.privateChatContainer.dataset.user = user;
+
+  // Update the chat header with the user's name
+  const chatUserName = document.getElementById('chat-user-name');
+  if (chatUserName) {
+    chatUserName.textContent = `with ${user}`;
+  }
 
   // Activate the clicked tab
   document.querySelectorAll('.pm-tab').forEach((btn) => btn.classList.remove('active'));

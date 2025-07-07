@@ -1,5 +1,6 @@
 from fastapi import WebSocket
 import json
+from server.utils.models import UserListMessage, ChatMessageData
 
 class ConnectionManager:
     def __init__(self):
@@ -46,13 +47,13 @@ class ConnectionManager:
 
     async def broadcast_user_list(self):
         usernames = list(self.active_connections.keys())
-        message = {"type": "user_list", "users": usernames}
+        message = UserListMessage(users=usernames)
         # Create a copy of connections to avoid modification during iteration
         connections_copy = list(self.active_connections.items())
         
         for username, ws in connections_copy:
             try:
-                await ws.send_json(message)
+                await ws.send_json(message.model_dump(by_alias=True))
             except Exception:
                 # Connection is closed, remove it from active connections
                 if username in self.active_connections:
@@ -73,3 +74,7 @@ class ConnectionManager:
                 }
             }
             await websocket.send_json(welcome_msg)
+
+
+
+

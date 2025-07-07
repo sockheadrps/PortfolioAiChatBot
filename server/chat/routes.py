@@ -7,6 +7,7 @@ from server.chat.manager import ConnectionManager
 from server.auth.auth import SECRET_KEY, ALGORITHM
 from server.utils.models import WsEvent, ChatMessageData, JoinData, LeaveData, ServerBroadcastData
 from server.chat.private_manager import PrivateConnectionManager
+from server.chat.bot_user import initialize_bot, get_bot
 
 
 router = APIRouter()
@@ -37,6 +38,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
     await manager.connect(websocket, username)
     await private_manager.connect(websocket, username)
+    
+    # Initialize bot if not already done
+    bot = get_bot()
+    if bot is None:
+        await initialize_bot(manager, private_manager)
 
     try:
         while True:
@@ -54,10 +60,18 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
             elif msg_type == "pm_invite":
                 recipient = data.get("to")
-                await private_manager.send_to_user(recipient, {
-                    "type": "pm_invite",
-                    "from": username
-                })
+                
+                # Check if the recipient is the bot
+                bot = get_bot()
+                if bot and recipient == bot.username:
+                    # Bot automatically accepts PM invites
+                    await bot.handle_pm_invite(username)
+                else:
+                    # Send invite to regular user
+                    await private_manager.send_to_user(recipient, {
+                        "type": "pm_invite",
+                        "from": username
+                    })
 
             elif msg_type == "pm_accept":
                 recipient = data.get("to")
@@ -76,34 +90,66 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             elif msg_type == "pm_message":
                 recipient = data.get("to")
                 ciphertext = data.get("ciphertext")
-                await private_manager.send_to_user(recipient, {
-                    "type": "pm_message",
-                    "from": username,
-                    "ciphertext": ciphertext
-                })
+                
+                # Check if the recipient is the bot
+                bot = get_bot()
+                if bot and recipient == bot.username:
+                    # Bot handles the message and responds
+                    await bot.handle_pm_message(username, ciphertext)
+                else:
+                    # Send message to regular user
+                    await private_manager.send_to_user(recipient, {
+                        "type": "pm_message",
+                        "from": username,
+                        "ciphertext": ciphertext
+                    })
 
             elif msg_type == "pm_disconnect":
                 recipient = data.get("to")
-                await private_manager.send_to_user(recipient, {
-                    "type": "pm_disconnect",
-                    "from": username
-                })
+                
+                # Check if the recipient is the bot
+                bot = get_bot()
+                if bot and recipient == bot.username:
+                    # Bot handles disconnect
+                    await bot.handle_pm_disconnect(username)
+                else:
+                    # Send disconnect to regular user
+                    await private_manager.send_to_user(recipient, {
+                        "type": "pm_disconnect",
+                        "from": username
+                    })
 
             elif msg_type == "pubkey_request":
                 recipient = data.get("to")
-                await private_manager.send_to_user(recipient, {
-                    "type": "pubkey_request",
-                    "from": username
-                })
+                
+                # Check if the recipient is the bot
+                bot = get_bot()
+                if bot and recipient == bot.username:
+                    # Bot handles the public key request
+                    await bot.handle_pubkey_request(username)
+                else:
+                    # Send pubkey request to regular user
+                    await private_manager.send_to_user(recipient, {
+                        "type": "pubkey_request",
+                        "from": username
+                    })
 
             elif msg_type == "pubkey_response":
                 recipient = data.get("to")
                 public_key = data.get("public_key")
-                await private_manager.send_to_user(recipient, {
-                    "type": "pubkey_response",
-                    "from": username,
-                    "public_key": public_key
-                })
+                
+                # Check if the recipient is the bot
+                bot = get_bot()
+                if bot and recipient == bot.username:
+                    # Bot stores the user's public key
+                    await bot.handle_pubkey_response(username, public_key)
+                else:
+                    # Send pubkey response to regular user
+                    await private_manager.send_to_user(recipient, {
+                        "type": "pubkey_response",
+                        "from": username,
+                        "public_key": public_key
+                    })
 
             elif msg_type == "pubkey":
                 private_manager.register_pubkey(username, data["key"])
