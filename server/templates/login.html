@@ -4,78 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login</title>
-    <style>
-      body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-      }
-
-      .login-container {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 16px;
-        padding: 30px 40px;
-        width: 100%;
-        max-width: 400px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-        color: white;
-      }
-
-      .login-container h2 {
-        margin-bottom: 20px;
-        font-size: 24px;
-        text-align: center;
-      }
-
-      .login-container input {
-        width: 100%;
-        padding: 12px 15px;
-        margin: 10px 0;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.15);
-        color: white;
-        font-size: 16px;
-        outline: none;
-      }
-
-      .login-container input::placeholder {
-        color: rgba(255, 255, 255, 0.7);
-      }
-
-      .login-container button {
-        width: 100%;
-        padding: 12px;
-        margin-top: 15px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        border: none;
-        color: white;
-        font-size: 16px;
-        font-weight: bold;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .login-container button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-      }
-
-      .error-message {
-        color: #ffaaaa;
-        margin-top: 10px;
-        text-align: center;
-      }
-    </style>
+    <link rel="stylesheet" href="/static/login.css" />
   </head>
   <body>
+    <div class="chat-bubbles">
+      <div class="chat-bubble">
+        <div class="bubble-content">
+          📢 General Chat: Messages exchanged in the general chat are not logged or saved by the
+          server but are unencrypted and visible to all users.
+        </div>
+        <div class="system-label">System</div>
+      </div>
+      <div class="chat-bubble">
+        <div class="bubble-content">
+          🔒 Private Messages: Messages exchanged in PMs are end-to-end encrypted with AES-256
+          encryption. The server cannot decrypt them and only you and the recipient can read these
+          messages.
+        </div>
+        <div class="system-label">System</div>
+      </div>
+      <div class="chat-bubble">
+        <div class="bubble-content">
+          💡 Tip: Click the PM button next to any user in the Online Users panel by hovering over
+          their name to start a private conversation!
+        </div>
+        <div class="system-label">System</div>
+      </div>
+    </div>
+
     <div class="login-container">
       <h2>Login</h2>
       <form id="login-form">
@@ -84,24 +40,12 @@
         <button type="submit">Login</button>
         <div class="error-message" id="error-msg"></div>
       </form>
-      
-      <div style="text-align: center; margin-top: 20px;">
-        <button onclick="window.location.href='/register'" style="
-          width: 100%;
-          padding: 12px;
-          background: rgba(255,255,255,0.2);
-          border: 1px solid rgba(255,255,255,0.4);
-          color: white;
-          font-size: 14px;
-          font-weight: bold;
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        ">
+
+      <div class="register-section">
+        <button class="register-button" onclick="window.location.href='/register'">
           Don't have an account? Register
         </button>
       </div>
-      
     </div>
     <script src="/static/login.js"></script>
   </body>

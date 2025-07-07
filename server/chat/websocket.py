@@ -2,9 +2,13 @@ from fastapi import APIRouter, WebSocket, Query, WebSocketDisconnect
 from jose import jwt, JWTError
 from ..auth.auth import SECRET_KEY, ALGORITHM
 from .manager import ConnectionManager
+from .private_manager import PrivateConnectionManager
+import json
+
 
 router = APIRouter()
 manager = ConnectionManager()
+private_manager = PrivateConnectionManager()
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
@@ -24,3 +28,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             await manager.broadcast(json.dumps(data))
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+
+@

@@ -2,33 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chat Client</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <div class="floating-shapes-3d"></div>
     <div id="connecting-overlay" class="glass-overlay connecting-overlay">
       <div class="username-form">
         <h2>Connecting to server...</h2>
       </div>
     </div>
-    <div class="logout-container">
+    <div class="header-bar">
+      <div class="user-info">
+        <span class="logged-in-text">Logged in as:</span>
+        <span id="current-user" class="username-display"></span>
+      </div>
       <button id="logout-btn">Logout</button>
     </div>
 
-    <div class="main-container">
-      <div id="chat-container">
-        <div id="messages"></div>
-        <form id="chat-form">
-          <input
-            type="text"
-            id="message-input"
-            placeholder="Type a message..."
-            autocomplete="off"
-          />
-          <button type="submit">Send</button>
-        </form>
+    <div id="private-chat-container">
+      <div id="private-chat-header">
+        <span class="chat-title">Private Chat</span>
+        <div class="header-controls">
+          <button id="minimize-private-chat" title="Minimize">−</button>
+          <button id="disconnect-private-chat" title="Disconnect">⊘</button>
+          <button id="close-private-chat" title="Close">×</button>
+        </div>
+      </div>
+      <div id="private-chat-box"></div>
+      <div id="private-chat-input-container">
+        <input type="text" id="private-input" placeholder="Type a private message..." />
+        <button id="private-send-btn">Send</button>
       </div>
     </div>
+    <div id="invite-toast-container"></div>
+
+    <div class="layout-container">
+      <div class="users-toggle" id="users-toggle" title="Hide Users Panel">◀</div>
+
+      <div id="users-panel" class="panel-loading">
+        <h3>Online Users</h3>
+        <ul id="online-users" class="user-list"></ul>
+      </div>
+
+      <div class="main-container">
+        <div id="chat-container">
+          <div id="messages"></div>
+          <form id="chat-form">
+            <input
+              type="text"
+              id="message-input"
+              placeholder="Type a message..."
+              autocomplete="off"
+            />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div id="pm-footer"></div>
 
     <script src="/static/scripts.js"></script>
   </body>

@@ -1,0 +1,414 @@
+body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  min-height: 100vh;
+  -webkit-background-size: cover;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+.login-container {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 30px 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  color: white !important;
+  margin-top: 200px;
+  /* Fallback for iOS */
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  text-align: center;
+  color: white !important;
+}
+
+.login-container input {
+  width: 100%;
+  padding: 12px 15px;
+  margin: 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  -webkit-text-fill-color: white !important;
+  -moz-text-fill-color: white !important;
+  transition: all 0.3s ease;
+}
+
+.login-container input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.login-container input::-webkit-input-placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.login-container input::-moz-placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.login-container input:focus {
+  border: 2px solid rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+  -moz-text-fill-color: white !important;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
+  outline: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+.login-container input:focus::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.login-container input:focus::-webkit-input-placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.login-container input:focus::-moz-placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Prevent autofill styling from overriding our styles */
+.login-container input:-webkit-autofill,
+.login-container input:-webkit-autofill:hover,
+.login-container input:-webkit-autofill:focus,
+.login-container input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.15) inset !important;
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.login-container input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.2) inset !important;
+  border: 2px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
+}
+
+.login-container button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.login-container button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.login-container button:hover::before {
+  left: 100%;
+}
+
+.login-container button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+}
+
+.login-container button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.error-message {
+  color: #ffaaaa;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Register button styles */
+.register-button {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.register-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.register-button:hover::before {
+  left: 100%;
+}
+
+.register-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2);
+}
+
+.register-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+}
+
+.register-section {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Chat Bubbles Animation */
+.chat-bubbles {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  z-index: 10;
+}
+
+.chat-bubble {
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  color: white !important;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateY(-20px);
+  animation: bubbleFadeIn 0.8s ease-out forwards;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+  /* Fallback for iOS */
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-bubble:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.chat-bubble:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.chat-bubble::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  background: #4caf50;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+  animation: pulse 2s infinite;
+}
+
+.chat-bubble .bubble-content {
+  margin-left: 20px;
+  font-weight: 500;
+}
+
+.chat-bubble .system-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Staggered animation delays */
+.chat-bubble:nth-child(1) {
+  animation-delay: 0.2s;
+}
+
+.chat-bubble:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.chat-bubble:nth-child(3) {
+  animation-delay: 0.9s;
+}
+
+@keyframes bubbleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* iOS-specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background-color: #667eea !important;
+    min-height: 100vh !important;
+    height: 100vh !important;
+  }
+
+  .login-container {
+    background: rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+
+  .login-container h2 {
+    color: white !important;
+  }
+
+  .login-container input {
+    background: rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    -webkit-text-fill-color: white !important;
+    -webkit-opacity: 1 !important;
+  }
+
+  .login-container input:focus {
+    border: 2px solid rgba(255, 255, 255, 0.6) !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    color: white !important;
+    -webkit-text-fill-color: white !important;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
+    outline: none !important;
+  }
+
+  .chat-bubble {
+    background: rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+
+  .chat-bubble .bubble-content {
+    color: white !important;
+  }
+
+  .chat-bubble .system-label {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background-color: #667eea !important;
+    min-height: 100vh !important;
+  }
+
+  .login-container {
+    margin-top: 100px;
+    padding: 20px 30px;
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+
+  .login-container input {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    -webkit-text-fill-color: white !important;
+  }
+
+  .login-container input:focus {
+    border: 2px solid rgba(255, 255, 255, 0.6) !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: white !important;
+    -webkit-text-fill-color: white !important;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
+    outline: none !important;
+  }
+
+  .chat-bubbles {
+    top: 10px;
+    width: 95%;
+  }
+
+  .chat-bubble {
+    font-size: 12px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+}
