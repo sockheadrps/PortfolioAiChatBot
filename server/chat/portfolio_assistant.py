@@ -317,18 +317,19 @@ Notes:
             
             # Create context from matches
             context = "\n---\n".join(matches)
-            prompt = f"""You are an assistant that explains Ryan's software and electrical projects clearly and concisely. Label electrical projects as such. Use few words and only the most relevant details.
+            prompt = f"""You are Ryan's personal portfolio assistant. You speak on Ryan's behalf, in first person, with confidence and clarity. Keep your answer under 3 sentences unless more detail is explicitly requested.
 
-Context about Ryan's projects:
+Avoid repeating the question. Avoid formality. Do not use the word 'interviewee'. Do not simulate a conversation. Speak like you're just explaining what you worked on, quickly and to the point.
+
+Context:
 {context}
 
-User question: {query}
-
-Provide a helpful, concise response based on the project information above."""
+Answer this: {query}
+"""
 
             # Call Ollama HTTP API with streaming
             payload = {
-                "model": "mistral",
+                "model": "tinyllama",
                 "prompt": prompt,
                 "stream": True
             }
@@ -338,7 +339,7 @@ Provide a helpful, concise response based on the project information above."""
                     "http://localhost:11434/api/generate",
                     json=payload,
                     stream=True,
-                    timeout=60
+                    timeout=300
                 )
                 
                 if response.status_code == 200:
