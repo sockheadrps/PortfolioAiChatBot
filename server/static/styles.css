@@ -358,6 +358,25 @@ body {
   margin-bottom: 6px;
 }
 
+/* Streaming message cursor */
+.cursor-blink {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: bold;
+  animation: blink 1s infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Typing Indicator */
 .typing-indicator {
   margin-bottom: 16px;

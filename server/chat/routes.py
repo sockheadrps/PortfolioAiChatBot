@@ -17,7 +17,7 @@ private_manager = PrivateConnectionManager()
 
 
 async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager):
-    """Handle bot responses to public chat messages"""
+    """Handle bot responses to public chat messages with streaming support"""
     import asyncio
     
     message_lower = message.lower()
@@ -35,19 +35,57 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
             }))
             
             # Add delay to make it feel more natural
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(1.0)
             
-            # Generate bot response using portfolio assistant
-            bot_response = bot.portfolio_assistant.get_response(message)
+            # Generate streaming bot response using portfolio assistant
+            response_buffer = ""
+            is_first_chunk = True
             
-            # Broadcast bot response
-            await manager.broadcast(json.dumps({
-                "event": "chat_message",
-                "data": {
-                    "user": bot.username,
-                    "message": bot_response
-                }
-            }))
+            try:
+                for chunk in bot.portfolio_assistant.get_response_stream(message):
+                    if chunk:
+                        response_buffer += chunk
+                        
+                        # Send streaming chunk
+                        await manager.broadcast(json.dumps({
+                            "event": "bot_message_stream",
+                            "data": {
+                                "user": bot.username,
+                                "chunk": chunk,
+                                "is_first": is_first_chunk,
+                                "is_complete": False
+                            }
+                        }))
+                        
+                        is_first_chunk = False
+                        
+                        # Small delay between chunks for better UX
+                        await asyncio.sleep(0.1)
+                
+                # Send completion signal
+                await manager.broadcast(json.dumps({
+                    "event": "bot_message_stream",
+                    "data": {
+                        "user": bot.username,
+                        "chunk": "",
+                        "is_first": False,
+                        "is_complete": True,
+                        "full_message": response_buffer
+                    }
+                }))
+                
+            except Exception as stream_error:
+                print(f"❌ Error in streaming response: {stream_error}")
+                # Fallback to complete message if streaming fails
+                fallback_response = bot.portfolio_assistant.get_response(message)
+                
+                await manager.broadcast(json.dumps({
+                    "event": "chat_message",
+                    "data": {
+                        "user": bot.username,
+                        "message": fallback_response
+                    }
+                }))
             
         except Exception as e:
             print(f"❌ Error generating bot response: {e}")

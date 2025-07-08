@@ -243,6 +243,42 @@ const messageHandler = {
     container.appendChild(msgDiv);
     utils.scrollToBottom(container);
   },
+
+  handleStreamingChunk: (container, user, chunk, isFirst) => {
+    let streamingMessage = container.querySelector('#streaming-message');
+
+    if (isFirst || !streamingMessage) {
+      // Create new streaming message div
+      streamingMessage = utils.createElement('div', 'message bot streaming');
+      streamingMessage.id = 'streaming-message';
+      streamingMessage.innerHTML = `
+        <span class="user-name">${user}</span>
+        <span class="message-text"></span>
+        <span class="cursor-blink">|</span>
+      `;
+      container.appendChild(streamingMessage);
+    }
+
+    // Append chunk to the message text
+    const messageText = streamingMessage.querySelector('.message-text');
+    if (messageText && chunk) {
+      messageText.textContent += chunk;
+    }
+
+    utils.scrollToBottom(container);
+  },
+
+  completeStreamingMessage: (container, user) => {
+    const streamingMessage = container.querySelector('#streaming-message');
+    if (streamingMessage) {
+      // Remove cursor and streaming class
+      const cursor = streamingMessage.querySelector('.cursor-blink');
+      if (cursor) cursor.remove();
+
+      streamingMessage.classList.remove('streaming');
+      streamingMessage.removeAttribute('id'); // Remove ID so it's treated as normal message
+    }
+  },
 };
 
 // WebSocket message handlers
@@ -264,6 +300,23 @@ const socketHandlers = {
   bot_typing: (data) => {
     if (elements.messages && data.typing) {
       messageHandler.showTypingIndicator(elements.messages, data.user);
+    }
+  },
+
+  bot_message_stream: (data) => {
+    if (!elements.messages) return;
+
+    // Hide typing indicator on first chunk
+    if (data.is_first) {
+      messageHandler.hideTypingIndicator(elements.messages);
+    }
+
+    // Handle streaming chunks
+    if (!data.is_complete) {
+      messageHandler.handleStreamingChunk(elements.messages, data.user, data.chunk, data.is_first);
+    } else {
+      // Stream is complete
+      messageHandler.completeStreamingMessage(elements.messages, data.user);
     }
   },
 
@@ -372,7 +425,7 @@ const socketHandlers = {
 // WebSocket setup
 function setupSocket() {
   // socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
-  socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
+  socket = new WebSocket(`wss://chat.socksthoughtshop.lol/ws?token=${token}`);
 
   socket.addEventListener('open', () => {
     elements.form.style.pointerEvents = 'auto';
@@ -872,18 +925,12 @@ function toggleUsersPanel() {
 
 // Welcome Modal Functions
 function showWelcomeModal() {
-  // Check if user has seen the welcome modal before
-  const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
-
-  if (!hasSeenWelcome) {
-    elements.welcomeModal?.classList.remove('hidden');
-  }
+  // Always show the welcome modal
+  elements.welcomeModal?.classList.remove('hidden');
 }
 
 function hideWelcomeModal() {
   elements.welcomeModal?.classList.add('hidden');
-  // Mark that user has seen the welcome modal
-  localStorage.setItem('hasSeenWelcome', 'true');
 }
 
 function setupWelcomeModalHandlers() {

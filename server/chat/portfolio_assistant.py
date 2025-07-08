@@ -5,8 +5,9 @@ import pickle
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator, Callable
 import subprocess
+import requests
 import chromadb
 from chromadb.config import Settings
 
@@ -291,12 +292,28 @@ Notes:
 
     
     def ask_ollama(self, query: str, matches: List[str]) -> str:
-        """Generate response using Ollama with relevant project context."""
+        """Generate response using Ollama with relevant project context (non-streaming fallback)."""
         try:
-            
-            
             if not matches:
                 return self._get_fallback_response(query)
+            
+            # For backward compatibility, use the streaming version and join the results
+            response_parts = []
+            for chunk in self.ask_ollama_stream(query, matches):
+                response_parts.append(chunk)
+            
+            return "".join(response_parts) if response_parts else self._get_fallback_response(query)
+                
+        except Exception as e:
+            print(f"❌ Error with Ollama: {e}")
+            return self._get_simple_response(matches, query)
+
+    def ask_ollama_stream(self, query: str, matches: List[str]) -> Iterator[str]:
+        """Generate streaming response using Ollama HTTP API with relevant project context."""
+        try:
+            if not matches:
+                yield self._get_fallback_response(query)
+                return
             
             # Create context from matches
             context = "\n---\n".join(matches)
@@ -309,33 +326,58 @@ User question: {query}
 
 Provide a helpful, concise response based on the project information above."""
 
+            # Call Ollama HTTP API with streaming
+            payload = {
+                "model": "mistral",
+                "prompt": prompt,
+                "stream": True
+            }
             
-            # Call Ollama
-            result = subprocess.run(
-                ["ollama", "run", "mistral"],
-                input=prompt.encode(),
-                capture_output=True,
-                timeout=30  # 30 second timeout
-            )
-            
-            if result.returncode == 0:
-                response = result.stdout.decode().strip()
-                return response if response else self._get_fallback_response(query)
-            else:
-                print(f"❌ Ollama error: {result.stderr.decode()}")
-                return self._get_simple_response(matches, query)
+            try:
+                response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json=payload,
+                    stream=True,
+                    timeout=60
+                )
                 
-        except subprocess.TimeoutExpired:
-            print("⏰ Ollama request timed out")
-            return "I'm thinking about that... Could you try asking again in a moment?"
-        except FileNotFoundError:
-            print("❌ Ollama not found - using simple responses")
-            matches = self.query_portfolio(query)
-            return self._get_simple_response(matches, query)
+                if response.status_code == 200:
+                    buffer = ""
+                    for line in response.iter_lines():
+                        if line:
+                            try:
+                                data = json.loads(line.decode('utf-8'))
+                                if 'response' in data:
+                                    chunk = data['response']
+                                    buffer += chunk
+                                    
+                                    # Yield complete words/sentences for smoother display
+                                    if chunk in [' ', '.', '!', '?', '\n'] or len(buffer) >= 10:
+                                        yield buffer
+                                        buffer = ""
+                                
+                                # Check if generation is done
+                                if data.get('done', False):
+                                    if buffer:  # Yield any remaining content
+                                        yield buffer
+                                    break
+                                    
+                            except json.JSONDecodeError:
+                                continue
+                else:
+                    print(f"❌ Ollama HTTP error: {response.status_code}")
+                    yield self._get_simple_response(matches, query)
+                    
+            except requests.exceptions.ConnectionError:
+                print("❌ Cannot connect to Ollama - is it running?")
+                yield self._get_simple_response(matches, query)
+            except requests.exceptions.Timeout:
+                print("⏰ Ollama request timed out")
+                yield "I'm thinking about that... Could you try asking again in a moment?"
+                
         except Exception as e:
-            print(f"❌ Error with Ollama: {e}")
-            matches = self.query_portfolio(query)
-            return self._get_simple_response(matches, query)
+            print(f"❌ Error with Ollama streaming: {e}")
+            yield self._get_simple_response(matches, query)
     
     def _get_simple_response(self, matches: List[str], query: str) -> str:
         """Generate a simple response without Ollama."""
@@ -389,6 +431,21 @@ Provide a helpful, concise response based on the project information above."""
         except Exception as e:
             print(f"❌ Error getting response: {e}")
             return self._get_fallback_response(query)
+
+    def get_response_stream(self, query: str) -> Iterator[str]:
+        """Main optimized method to get a streaming response to a query."""
+        # Ensure all components are ready
+        if not self.projects:
+            yield self._get_fallback_response(query)
+            return
+        
+        try:
+            filter_type = self.infer_filter_type(query)
+            matches = self.query_portfolio(query, filter_type=filter_type)
+            yield from self.ask_ollama_stream(query, matches)
+        except Exception as e:
+            print(f"❌ Error getting streaming response: {e}")
+            yield self._get_fallback_response(query)
     
 
     def infer_filter_type(self, question: str) -> Optional[str]:
