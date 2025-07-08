@@ -25,6 +25,9 @@ const elements = {
   usersToggle: document.getElementById('users-toggle'),
   usersPanel: document.getElementById('users-panel'),
   mainContainer: document.querySelector('.main-container'),
+  welcomeModal: document.getElementById('welcome-modal'),
+  welcomeCloseBtn: document.getElementById('welcome-close'),
+  welcomeGotItBtn: document.getElementById('welcome-got-it'),
 };
 
 // Utility functions
@@ -375,6 +378,11 @@ function setupSocket() {
     elements.form.style.pointerEvents = 'auto';
     elements.form.style.opacity = '1';
     elements.connectingOverlay?.classList.add('hidden');
+
+    // Show welcome modal after successful connection
+    setTimeout(() => {
+      showWelcomeModal();
+    }, 500); // Small delay to let the UI settle
   });
 
   socket.addEventListener('message', (event) => {
@@ -862,6 +870,54 @@ function toggleUsersPanel() {
   }
 }
 
+// Welcome Modal Functions
+function showWelcomeModal() {
+  // Check if user has seen the welcome modal before
+  const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
+
+  if (!hasSeenWelcome) {
+    elements.welcomeModal?.classList.remove('hidden');
+  }
+}
+
+function hideWelcomeModal() {
+  elements.welcomeModal?.classList.add('hidden');
+  // Mark that user has seen the welcome modal
+  localStorage.setItem('hasSeenWelcome', 'true');
+}
+
+function setupWelcomeModalHandlers() {
+  // Close button handler
+  elements.welcomeCloseBtn?.addEventListener('click', hideWelcomeModal);
+
+  // Got it button handler
+  elements.welcomeGotItBtn?.addEventListener('click', hideWelcomeModal);
+
+  // Click outside modal to close
+  elements.welcomeModal?.addEventListener('click', (e) => {
+    if (e.target === elements.welcomeModal) {
+      hideWelcomeModal();
+    }
+  });
+
+  // Example tag click handlers
+  document.querySelectorAll('.example-tag').forEach((tag) => {
+    tag.addEventListener('click', () => {
+      const exampleText = tag.textContent;
+      elements.input.value = exampleText;
+      elements.input.focus();
+      hideWelcomeModal();
+    });
+  });
+
+  // ESC key to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !elements.welcomeModal?.classList.contains('hidden')) {
+      hideWelcomeModal();
+    }
+  });
+}
+
 // Initialize app
 window.addEventListener('DOMContentLoaded', () => {
   // Authentication
@@ -901,6 +957,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Users panel toggle
   elements.usersToggle?.addEventListener('click', toggleUsersPanel);
+
+  // Setup welcome modal handlers
+  setupWelcomeModalHandlers();
 
   // Initialize panel as hidden
   elements.usersPanel.classList.add('hidden');
