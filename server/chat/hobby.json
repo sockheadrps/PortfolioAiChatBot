@@ -16,7 +16,7 @@
       "Automotive Control"
     ],
     "code_url": "",
-    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/van",
+    "image": "/assets/hobby/van",
     "notes": [
       "Used ESP32 in WAP mode to host a secure control panel accessible via mobile devices.",
       "Controlled van locks, windows, and radio using solid state relays driven by GPIO.",
@@ -43,7 +43,7 @@
       "Musical Interface Design"
     ],
     "code_url": "",
-    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/gtr",
+    "image": "/assets/hobby/gtr",
     "notes": [
       "Cut and fabricated a physical overlay to mount on the guitar body for tactile interaction.",
       "Programmed a microcontroller to act as a class-compliant USB MIDI device.",
@@ -70,7 +70,7 @@
       "Power Electronics"
     ],
     "code_url": "",
-    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/blepcb",
+    "image": "/assets/hobby/blepcb",
     "notes": [
       "Etched a custom PCB using ferric chloride on copper-clad substrate for clean, functional routing.",
       "Designed a 4-channel MOSFET switching circuit to control 3 RGB channels and one auxiliary output.",
