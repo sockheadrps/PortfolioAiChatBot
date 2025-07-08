@@ -171,7 +171,17 @@ class ChatBot:
         
         message_lower = message.lower()
         
-        # Check if this is a portfolio/technical question
+        # FIRST: Check if portfolio assistant is waiting for input from this user
+        try:
+            user_state = self.portfolio_assistant.get_user_state(user)
+            if user_state.get("awaiting_hobby_choice"):
+                # User is in hobby selection mode, send message directly to portfolio assistant
+                portfolio_response = self.portfolio_assistant.get_response(message, user_id=user)
+                return portfolio_response
+        except Exception as e:
+            print(f"❌ Error checking user state: {e}")
+        
+        # SECOND: Check if this is a portfolio/technical question
         portfolio_keywords = [
             'project', 'projects', 'work', 'experience', 'skills', 'technologies', 'tech',
             'programming', 'development', 'built', 'created', 'developed', 'portfolio',
@@ -182,13 +192,14 @@ class ChatBot:
             'fastapi', 'websocket', 'three.js', 'encryption', 'chat', 'e-commerce',
             'docker', 'stripe', 'mongodb', 'express', 'typescript', 'next.js',
             'scikit-learn', 'pandas', 'numpy', 'matplotlib', 'jupyter', 'data',
-            'analytics', 'model', 'algorithm', 'css', 'html', 'responsive'
+            'analytics', 'model', 'algorithm', 'css', 'html', 'responsive',
+            'hobbies', 'hobby', 'microcontrollers', 'esp32', 'midi', 'pcb', 'hardware'
         ]
         
         # Use Portfolio Assistant for technical/portfolio questions
         if any(keyword in message_lower for keyword in portfolio_keywords):
             try:
-                portfolio_response = self.portfolio_assistant.get_response(message)
+                portfolio_response = self.portfolio_assistant.get_response(message, user_id=user)
                 return portfolio_response
             except Exception as e:
                 print(f"❌ Error getting portfolio response: {e}")

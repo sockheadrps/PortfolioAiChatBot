@@ -114,6 +114,24 @@
             <button type="submit">Send</button>
           </form>
         </div>
+
+        <!-- Image Gallery Container -->
+        <div id="image-gallery-container" class="image-gallery-container hidden">
+          <div class="gallery-header">
+            <h3 id="gallery-title">Project Images</h3>
+            <button id="gallery-close" class="gallery-close-btn">&times;</button>
+          </div>
+          <div class="gallery-content">
+            <div class="gallery-images" id="gallery-images">
+              <!-- Images will be loaded here dynamically -->
+            </div>
+            <div class="gallery-controls">
+              <button id="gallery-prev" class="gallery-btn">← Previous</button>
+              <span id="gallery-counter" class="gallery-counter">1 of 2</span>
+              <button id="gallery-next" class="gallery-btn">Next →</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="pm-footer"></div>

@@ -16,7 +16,7 @@
     "SQLAlchemy",
     "JavaScript"
   ],
-  "code_url": "https://github.com/sockheadrps/your-chat-app-repo",  
+  "code_url": "https://github.com/sockheadrps/websocketchat",  
   "notes": [
     "Implemented token-based authentication using JWT and secure cookies.",
     "Encrypted private messages using RSA-OAEP end-to-end encryption.",
@@ -57,7 +57,7 @@
 },
 {
   "name": "rpaudio",
-  "description": "Rust-based Python library for non-blocking audio playback with a simple and intuitive API. Designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.",
+  "description": "RPAudio is a rust-based Python library for non-blocking audio playback with a simple and intuitive API. Designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.",
   "type": "software",
   "skills": [
     "Rust",

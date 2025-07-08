@@ -1,12 +1,12 @@
 [
   {
     "name": "AWS Data Center UPS & Power Infrastructure",
-    "type": "electrical",
+    "type": "electrical", 
     "description": "Installed and commissioned critical power infrastructure across AWS data centers, including UPS battery racks, addressed distribution cabling, generator interconnects, and final commissioning of bus duct systems during load bank testing.",
     "skills": [
       "Power Distribution",
       "UPS Systems",
-      "Battery Modules",
+      "Battery Modules", 
       "Generator Systems",
       "ATS",
       "Commissioning",
@@ -16,7 +16,7 @@
       "Cable Management"
     ],
     "code_url": "",
-    "image": "assets/aws_ups_commissioning.jpg",
+    "image": "",
     "notes": [
       "Installed and configured UPS battery racks, including addressable modules and secure cable routing.",
       "Distributed high-amperage addressed cables from UPS racks to server cabinets and switchboards.",
@@ -32,7 +32,7 @@
     "description": "Worked as a subcontractor for AIDA America assembling and retrofitting servo-controlled metal forming presses ranging from 200 to 4,000 metric tons. Involved in both in-house press manufacturing and on-site retrofitting for operational customer presses.",
     "skills": [
       "Servo Systems",
-      "PLC Integration",
+      "PLC Integration", 
       "Press Commissioning",
       "Sensor Wiring",
       "Industrial Retrofit",
@@ -43,8 +43,8 @@
       "Problem Solving"
     ],
     "code_url": "",
-    "image": "assets/aida_servo_press.jpg",
-    "notes": [
+    "image": "assets/aida",
+    "notes": [  
       "Installed and routed communication cables between sensors, control modules, and safety systems according to complex engineered schematics.",
       "Planned around hydraulic, mechanical, and operational constraints to execute clean, reliable electrical runs in high-density equipment.",
       "Worked on presses rated up to 4,000 metric tons in an ISO 9001:2015 certified manufacturing environment.",
@@ -70,7 +70,7 @@
       "Field Reporting"
     ],
     "code_url": "",
-    "image": "assets/tegg_qa_inspection.jpg",
+    "image": "assets/paintbooth",
     "notes": [
       "Executed electrical system inspections using infrared, ultrasonic, and mechanical testing equipment per TEGG standards.",
       "Assessed the condition of power distribution equipment, including conductors, switchgear, transformers, and motors.",
@@ -97,7 +97,7 @@
       "Mission-Critical Uptime"
     ],
     "code_url": "",
-    "image": "assets/hyperscale_maintenance.jpg",
+    "image": "",
     "notes": [
       "Maintained and serviced ATS, inverters, power monitoring, and air quality measurement infrastructure in hyperscale data centers.",
       "Installed and maintained high-current 3-phase subpanels, transformers, and building-wide electrical infrastructure exceeding 10MW.",

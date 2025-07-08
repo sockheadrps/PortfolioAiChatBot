@@ -59,34 +59,6 @@ DATA_PATH = Path("data.json")
 async def get_form(request: Request):
     return templates.TemplateResponse("form.html", {"request": request})
 
-@app.post("/submit")
-async def submit_form(
-    name: str = Form(...),
-    description: str = Form(...),
-    skills: str = Form(...),
-    code_url: str = Form(...),
-    image: str = Form(...),
-    notes: str = Form(...)
-):
-    new_entry = {
-        "name": name,
-        "description": description,
-        "skills": [s.strip() for s in skills.split(",")],
-        "code_url": code_url,
-        "image": image,
-        "notes": json.loads(notes)  # notes will be passed as JSON string
-    }
-
-    data = []
-    if DATA_PATH.exists():
-        with DATA_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-    data.append(new_entry)
-    with DATA_PATH.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    return RedirectResponse("/form", status_code=303)
 
 
 

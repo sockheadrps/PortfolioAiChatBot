@@ -1,3 +1,63 @@
+// ========== CONFIGURATION ==========
+// WebSocket URLs - Configure your connections here
+const WS_CONFIG = {
+  // Local development
+  LOCAL_WS_URL: 'ws://localhost:8080/ws',
+
+  // Production
+  PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
+
+  // Current active URL (switch between LOCAL_WS_URL and PRODUCTION_WS_URL)
+  ACTIVE_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
+};
+
+// AI Model Configuration - For reference (actual config is in portfolio_assistant.py)
+const AI_MODEL_CONFIG = {
+  // Current model being used by the backend
+  CURRENT_MODEL: 'llama3.2',
+
+  // Available models (change in backend portfolio_assistant.py)
+  AVAILABLE_MODELS: [
+    'tinyllama',
+    'mistral',
+    'llama2',
+    'llama3.2',
+    'codellama',
+    'gemma',
+    'deepseek-r1:latest',
+  ],
+
+  // Model characteristics
+  MODEL_INFO: {
+    tinyllama: 'Fast, lightweight responses',
+    mistral: 'Balanced speed and quality',
+    llama2: 'High quality, slower responses',
+    'llama3.2': 'Advanced reasoning model, high quality responses',
+    codellama: 'Optimized for code questions',
+    gemma: 'Google model, good general purpose',
+    'deepseek-r1:latest': 'Advanced reasoning model, high quality responses',
+  },
+};
+
+// AI Prompt Configuration - For reference (actual config is in portfolio_assistant.py)
+const AI_PROMPT_CONFIG = {
+  // Current prompt style being used
+  CURRENT_STYLE: 'technical',
+
+  // Available prompt styles (change in backend portfolio_assistant.py)
+  AVAILABLE_STYLES: ['default', 'formal', 'casual', 'technical'],
+
+  // Style descriptions
+  STYLE_INFO: {
+    default: 'First-person, confident, concise responses',
+    formal: 'Professional, detailed, formal responses',
+    casual: 'Conversational, friendly, relaxed tone',
+    technical: 'Engineering-focused, precise, technical but very short',
+  },
+};
+
+// ====================================
+
 // State management
 let socket = null;
 let currentUsername = '';
@@ -191,6 +251,33 @@ const utils = {
 // Message handling
 const messageHandler = {
   addMessage: (container, user, message, className = '') => {
+    // Check for gallery commands before displaying message
+    // Format: [GALLERY_SHOW|images||separated||by||pipes|title]
+    const galleryMatch = message.match(/\[GALLERY_SHOW\|(.*?)\|([^|]+)\]/);
+    if (galleryMatch) {
+      const [fullMatch, imagesStr, title] = galleryMatch;
+      console.log('🔍 Gallery command detected:', fullMatch);
+      console.log('🔍 Images string:', imagesStr);
+      console.log('🔍 Title:', title);
+
+      // Split images by || for multiple images, or use single image
+      const images = imagesStr.includes('||')
+        ? imagesStr.split('||').map((img) => img.trim())
+        : [imagesStr.trim()];
+      console.log('🔍 Parsed images:', images);
+
+      // Show the gallery
+      ImageGalleryController.showGallery(images, title);
+
+      // Remove the gallery command from the message
+      message = message.replace(fullMatch, '').trim();
+
+      // If the message is now empty, add a default text
+      if (!message) {
+        message = `📸 Showing ${images.length} image${images.length > 1 ? 's' : ''} for ${title}`;
+      }
+    }
+
     const msgDiv = utils.createElement('div', `message ${className}`);
     msgDiv.innerHTML = `
       <span class="user-name">${user}</span>
@@ -271,6 +358,42 @@ const messageHandler = {
   completeStreamingMessage: (container, user) => {
     const streamingMessage = container.querySelector('#streaming-message');
     if (streamingMessage) {
+      // Check for gallery commands in completed streaming message
+      const messageText = streamingMessage.querySelector('.message-text');
+      if (messageText) {
+        let content = messageText.textContent;
+        // Format: [GALLERY_SHOW|images||separated||by||pipes|title]
+        const galleryMatch = content.match(/\[GALLERY_SHOW\|(.*?)\|([^|]+)\]/);
+        if (galleryMatch) {
+          const [fullMatch, imagesStr, title] = galleryMatch;
+          console.log('🔍 Streaming Gallery command detected:', fullMatch);
+          console.log('🔍 Streaming Images string:', imagesStr);
+          console.log('🔍 Streaming Title:', title);
+
+          // Split images by || for multiple images, or use single image
+          const images = imagesStr.includes('||')
+            ? imagesStr.split('||').map((img) => img.trim())
+            : [imagesStr.trim()];
+          console.log('🔍 Streaming Parsed images:', images);
+
+          // Show the gallery
+          ImageGalleryController.showGallery(images, title);
+
+          // Remove the gallery command from the message
+          content = content.replace(fullMatch, '').trim();
+
+          // If the message is now empty, add a default text
+          if (!content) {
+            content = `📸 Showing ${images.length} image${
+              images.length > 1 ? 's' : ''
+            } for ${title}`;
+          }
+
+          // Update the message text
+          messageText.textContent = content;
+        }
+      }
+
       // Remove cursor and streaming class
       const cursor = streamingMessage.querySelector('.cursor-blink');
       if (cursor) cursor.remove();
@@ -424,8 +547,7 @@ const socketHandlers = {
 
 // WebSocket setup
 function setupSocket() {
-  // socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
-  socket = new WebSocket(`wss://chat.socksthoughtshop.lol/ws?token=${token}`);
+  socket = new WebSocket(`${WS_CONFIG.ACTIVE_WS_URL}?token=${token}`);
 
   socket.addEventListener('open', () => {
     elements.form.style.pointerEvents = 'auto';
@@ -1324,3 +1446,240 @@ window.addEventListener('load', () => {
     backgroundSystem.init();
   }, 500);
 });
+
+// ========== IMAGE GALLERY FUNCTIONS ==========
+// Functions to handle image gallery navigation for hobby projects
+
+function nextImage(galleryId) {
+  const gallery = document.getElementById(galleryId);
+  if (!gallery) return;
+
+  const images = gallery.querySelectorAll('.gallery-image');
+  const counter = gallery.querySelector('.image-counter');
+
+  let currentIndex = 0;
+  images.forEach((img, index) => {
+    if (img.classList.contains('active')) {
+      currentIndex = index;
+      img.classList.remove('active');
+      img.style.display = 'none';
+    }
+  });
+
+  const nextIndex = (currentIndex + 1) % images.length;
+  images[nextIndex].classList.add('active');
+  images[nextIndex].style.display = 'block';
+
+  if (counter) {
+    counter.textContent = `${nextIndex + 1} of ${images.length}`;
+  }
+}
+
+function previousImage(galleryId) {
+  const gallery = document.getElementById(galleryId);
+  if (!gallery) return;
+
+  const images = gallery.querySelectorAll('.gallery-image');
+  const counter = gallery.querySelector('.image-counter');
+
+  let currentIndex = 0;
+  images.forEach((img, index) => {
+    if (img.classList.contains('active')) {
+      currentIndex = index;
+      img.classList.remove('active');
+      img.style.display = 'none';
+    }
+  });
+
+  const prevIndex = currentIndex === 0 ? images.length - 1 : currentIndex - 1;
+  images[prevIndex].classList.add('active');
+  images[prevIndex].style.display = 'block';
+
+  if (counter) {
+    counter.textContent = `${prevIndex + 1} of ${images.length}`;
+  }
+}
+
+// Initialize gallery when images are loaded
+function initializeGalleries() {
+  // Initialize any existing galleries on page load
+  const galleries = document.querySelectorAll('.image-gallery');
+  galleries.forEach((gallery) => {
+    const images = gallery.querySelectorAll('.gallery-image');
+    if (images.length > 0) {
+      images[0].classList.add('active');
+      updateImageCounter(gallery.id, 1, images.length);
+    }
+  });
+}
+
+// Dedicated Image Gallery Controller
+const ImageGalleryController = {
+  currentImages: [],
+  currentIndex: 0,
+  isVisible: false,
+
+  // Show the gallery with given images and title
+  showGallery(images, title = 'Project Images') {
+    const container = document.getElementById('image-gallery-container');
+    const titleElement = document.getElementById('gallery-title');
+    const imagesContainer = document.getElementById('gallery-images');
+    const counter = document.getElementById('gallery-counter');
+
+    if (!container || !imagesContainer) return;
+
+    // Store current images
+    this.currentImages = images;
+    this.currentIndex = 0;
+    this.isVisible = true;
+
+    // Set title
+    titleElement.textContent = title;
+
+    // Clear existing images
+    imagesContainer.innerHTML = '';
+
+    // Add new images
+    images.forEach((imageSrc, index) => {
+      const img = document.createElement('img');
+      img.src = `/static/assets/${imageSrc}`;
+      img.alt = `${title} - Image ${index + 1}`;
+      img.className = index === 0 ? 'active' : '';
+      imagesContainer.appendChild(img);
+    });
+
+    // Update counter
+    this.updateCounter();
+
+    // Update navigation buttons
+    this.updateNavButtons();
+
+    // Show container
+    container.classList.remove('hidden');
+  },
+
+  // Hide the gallery
+  hideGallery() {
+    const container = document.getElementById('image-gallery-container');
+    if (container) {
+      container.classList.add('hidden');
+      this.isVisible = false;
+      this.currentImages = [];
+      this.currentIndex = 0;
+    }
+  },
+
+  // Navigate to next image
+  nextImage() {
+    if (this.currentImages.length <= 1) return;
+
+    const images = document.querySelectorAll('#gallery-images img');
+    if (images.length === 0) return;
+
+    // Hide current image
+    images[this.currentIndex].classList.remove('active');
+
+    // Move to next (with wrapping)
+    this.currentIndex = (this.currentIndex + 1) % this.currentImages.length;
+
+    // Show new image
+    images[this.currentIndex].classList.add('active');
+
+    // Update UI
+    this.updateCounter();
+    this.updateNavButtons();
+  },
+
+  // Navigate to previous image
+  previousImage() {
+    if (this.currentImages.length <= 1) return;
+
+    const images = document.querySelectorAll('#gallery-images img');
+    if (images.length === 0) return;
+
+    // Hide current image
+    images[this.currentIndex].classList.remove('active');
+
+    // Move to previous (with wrapping)
+    this.currentIndex =
+      this.currentIndex === 0 ? this.currentImages.length - 1 : this.currentIndex - 1;
+
+    // Show new image
+    images[this.currentIndex].classList.add('active');
+
+    // Update UI
+    this.updateCounter();
+    this.updateNavButtons();
+  },
+
+  // Update the image counter display
+  updateCounter() {
+    const counter = document.getElementById('gallery-counter');
+    if (counter && this.currentImages.length > 0) {
+      counter.textContent = `${this.currentIndex + 1} of ${this.currentImages.length}`;
+    }
+  },
+
+  // Update navigation button states
+  updateNavButtons() {
+    const prevBtn = document.getElementById('gallery-prev');
+    const nextBtn = document.getElementById('gallery-next');
+
+    if (prevBtn && nextBtn) {
+      const hasMultipleImages = this.currentImages.length > 1;
+      prevBtn.disabled = !hasMultipleImages;
+      nextBtn.disabled = !hasMultipleImages;
+    }
+  },
+};
+
+// Event listeners for gallery controls
+document.addEventListener('DOMContentLoaded', function () {
+  // Close gallery button
+  const closeBtn = document.getElementById('gallery-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      ImageGalleryController.hideGallery();
+    });
+  }
+
+  // Previous image button
+  const prevBtn = document.getElementById('gallery-prev');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      ImageGalleryController.previousImage();
+    });
+  }
+
+  // Next image button
+  const nextBtn = document.getElementById('gallery-next');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      ImageGalleryController.nextImage();
+    });
+  }
+
+  // Keyboard navigation for gallery
+  document.addEventListener('keydown', (e) => {
+    if (!ImageGalleryController.isVisible) return;
+
+    if (e.key === 'Escape') {
+      ImageGalleryController.hideGallery();
+    } else if (e.key === 'ArrowLeft') {
+      ImageGalleryController.previousImage();
+    } else if (e.key === 'ArrowRight') {
+      ImageGalleryController.nextImage();
+    }
+  });
+});
+
+// Auto-initialize galleries when new messages are added
+const originalAddMessage = typeof addMessage !== 'undefined' ? addMessage : null;
+if (originalAddMessage) {
+  window.addMessage = function (...args) {
+    const result = originalAddMessage.apply(this, args);
+    // Initialize galleries after message is added
+    setTimeout(initializeGalleries, 100);
+    return result;
+  };
+}

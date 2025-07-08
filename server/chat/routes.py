@@ -22,8 +22,21 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
     
     message_lower = message.lower()
     
-    # Only respond to @bot mentions
+    # Respond to @bot mentions OR if bot is waiting for input from this user
+    bot_should_respond = False
+    
     if '@bot' in message_lower:
+        bot_should_respond = True
+    else:
+        # Check if bot is waiting for input from this specific user
+        try:
+            user_state = bot.portfolio_assistant.get_user_state(username)
+            if user_state.get("awaiting_hobby_choice"):
+                bot_should_respond = True
+        except Exception as e:
+            print(f"❌ Error checking user state for routing: {e}")
+    
+    if bot_should_respond:
         try:
             # Send typing indicator
             await manager.broadcast(json.dumps({

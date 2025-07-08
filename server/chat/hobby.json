@@ -1,0 +1,83 @@
+[
+  {
+    "name": "ESP32 TCP/IP Van Controller",
+    "type": "hobby",
+    "description": "Designed and built a microcontroller-based system using an ESP32 in WAP mode to control van locks, windows, and radio via Wi-Fi and solid state relays over a custom encrypted private network web interface.",
+    "skills": [
+      "ESP32",
+      "TCP/IP",
+      "Wi-Fi Access Point",
+      "Microcontroller Design",
+      "PCB Etching",
+      "Custom Firmware",
+      "Solid State Relays",
+      "Embedded Systems",
+      "Encrypted Communication",
+      "Automotive Control"
+    ],
+    "code_url": "",
+    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/van",
+    "notes": [
+      "Used ESP32 in WAP mode to host a secure control panel accessible via mobile devices.",
+      "Controlled van locks, windows, and radio using solid state relays driven by GPIO.",
+      "Implemented custom encrypted communication over a private Wi-Fi network.",
+      "Designed and hand-etched a custom PCB using ferric chloride and copper-clad substrate.",
+      "Optimized circuit pathing for reliable signal delivery in a mobile environment.",
+      "Integrated relay switching logic with web interface for real-time hardware control."
+    ]
+  },
+  {
+    "name": "Guitar-Mounted MIDI Control Overlay",
+    "type": "hobby",
+    "description": "Built a custom guitar-mounted MIDI controller using a microcontroller and pressure-sensitive potentiometers to trigger sounds and control effects while playing. The system was mounted as a physical overlay and communicated as a standard MIDI device.",
+    "skills": [
+      "MIDI",
+      "Microcontroller Programming",
+      "Sensor Integration",
+      "Pressure-Sensitive Input",
+      "Analog Signal Processing",
+      "Digital Audio Control",
+      "Embedded Systems",
+      "Custom Hardware Design",
+      "Real-Time Control",
+      "Musical Interface Design"
+    ],
+    "code_url": "",
+    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/gtr",
+    "notes": [
+      "Cut and fabricated a physical overlay to mount on the guitar body for tactile interaction.",
+      "Programmed a microcontroller to act as a class-compliant USB MIDI device.",
+      "Integrated pressure-sensitive potentiometers positioned for access during guitar playing.",
+      "Mapped analog input from sensors to trigger MIDI notes and CC values for real-time effects control.",
+      "Designed for ergonomic use during live play, enabling expressive control of effects chains and instruments.",
+      "Created custom sensor thresholds to differentiate between pressure levels and gestures."
+    ]
+  },
+  {
+    "name": "BLE-Controlled RGB Strip with Custom PCB",
+    "type": "hobby",
+    "description": "Designed and fabricated a custom 4-channel MOSFET control PCB using ferric chloride and copper-clad board, enabling BLE-based control of a 12V RGB LED strip.",
+    "skills": [
+      "Custom PCB Design",
+      "MOSFET Switching",
+      "Ferric Chloride Etching",
+      "Copper-Clad Board Prototyping",
+      "BLE Integration",
+      "12V LED Control",
+      "Analog Circuit Design",
+      "Embedded Lighting Systems",
+      "Soldering & Prototyping",
+      "Power Electronics"
+    ],
+    "code_url": "",
+    "image": "C:/Users/rpski/Desktop/chat/server/static/assets/hobby/blepcb",
+    "notes": [
+      "Etched a custom PCB using ferric chloride on copper-clad substrate for clean, functional routing.",
+      "Designed a 4-channel MOSFET switching circuit to control 3 RGB channels and one auxiliary output.",
+      "Integrated a BLE module to receive wireless control input via mobile device or external trigger.",
+      "Matched logic-level inputs with MOSFET gate requirements for consistent switching at 12V.",
+      "Used onboard headers and terminals for clean integration with external LED strip and power supply.",
+      "Explored durability and thermal characteristics of the board under continuous RGB fading cycles."
+    ]
+  }
+]
