@@ -485,7 +485,7 @@ const socketHandlers = {
     sendPublicKey(data.from);
   },
 
-  pubkey_response: async (data) => {
+  pubkey_response: async (data) => {  
     // Received someone's public key
     try {
       const publicKey = await utils.importPublicKey(data.public_key);

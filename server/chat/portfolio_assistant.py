@@ -194,47 +194,57 @@ class PortfolioAssistant:
             import os
             image_path = proj['image']
             
-            # Convert absolute path to relative path for web serving
+            # Determine if we have an absolute or relative path and process accordingly
             if image_path.startswith("C:/Users/rpski/Desktop/chat/server/static/assets/"):
-                # Extract the relative path from static/assets/
+                # Absolute path - convert to relative
                 relative_path = image_path.replace("C:/Users/rpski/Desktop/chat/server/static/assets/", "")
-                
-                # Initialize empty list for image files
-                image_files_to_show = []
-                
-                # Check if it's a directory with multiple images
-                if os.path.isdir(image_path):
-                    # Get all image files from the directory
-                    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                    
-                    try:
-                        for filename in os.listdir(image_path):
-                            if any(filename.lower().endswith(ext) for ext in image_extensions):
-                                relative_file_path = f"{relative_path}/{filename}"
-                                image_files_to_show.append(relative_file_path)
-                        
-                        # Sort for consistent order
-                        image_files_to_show.sort()
-                        
-                    except Exception as e:
-                        print(f"❌ Error reading image directory {image_path}: {e}")
-                        # Skip image on error
-                        image_files_to_show = []
-                        
-                elif os.path.isfile(image_path):
-                    # Single image file
-                    filename = os.path.basename(image_path)
-                    relative_file_path = f"{relative_path}/{filename}"
-                    image_files_to_show = [relative_file_path]
-                
-                # Only create gallery if we have images
-                if image_files_to_show:
-                    image_gallery = self._create_image_gallery(image_files_to_show, proj["name"])
-                    if image_gallery:
-                        lines.append(f"\n{image_gallery}")
+                full_path = image_path  # Use the absolute path for file operations
+            elif image_path.startswith("/static/assets/"):
+                # Relative path starting with /static/assets/
+                relative_path = image_path.replace("/static/assets/", "")
+                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+            elif image_path.startswith("/assets/"):
+                # Relative path starting with /assets/
+                relative_path = image_path.replace("/assets/", "")
+                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
             else:
                 # For non-standard paths, skip image
                 print(f"🔍 Skipping non-standard image path in summary: {image_path}")
+                return
+            
+            # Initialize empty list for image files
+            image_files_to_show = []
+            
+            # Check if it's a directory with multiple images
+            if os.path.isdir(full_path):
+                # Get all image files from the directory
+                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+                
+                try:
+                    for filename in os.listdir(full_path):
+                        if any(filename.lower().endswith(ext) for ext in image_extensions):
+                            relative_file_path = f"{relative_path}/{filename}"
+                            image_files_to_show.append(relative_file_path)
+                    
+                    # Sort for consistent order
+                    image_files_to_show.sort()
+                    
+                except Exception as e:
+                    print(f"❌ Error reading image directory {full_path}: {e}")
+                    # Skip image on error
+                    image_files_to_show = []
+                    
+            elif os.path.isfile(full_path):
+                # Single image file
+                filename = os.path.basename(full_path)
+                relative_file_path = f"{relative_path}/{filename}"
+                image_files_to_show = [relative_file_path]
+            
+            # Only create gallery if we have images
+            if image_files_to_show:
+                image_gallery = self._create_image_gallery(image_files_to_show, proj["name"])
+                if image_gallery:
+                    lines.append(f"\n{image_gallery}")
 
         if proj.get("notes"):
             lines.append("\n**Highlights:**\n" + "\n".join(f"- {n}" for n in proj["notes"]))
@@ -318,52 +328,61 @@ class PortfolioAssistant:
             import os
             image_path = hobby['image']
             
-            # Convert absolute path to relative path for web serving
+            # Determine if we have an absolute or relative path and process accordingly
             if image_path.startswith("C:/Users/rpski/Desktop/chat/server/static/assets/"):
-                # Extract the relative path from static/assets/
+                # Absolute path - convert to relative
                 relative_path = image_path.replace("C:/Users/rpski/Desktop/chat/server/static/assets/", "")
-                
-                # Initialize empty list for image files
-                image_files_to_show = []
-                
-                # Check if it's a directory with multiple images
-                if os.path.isdir(image_path):
-                    # Get all image files from the directory
-                    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                    
-                    try:
-                        for filename in os.listdir(image_path):
-                            if any(filename.lower().endswith(ext) for ext in image_extensions):
-                                relative_file_path = f"{relative_path}/{filename}"
-                                image_files_to_show.append(relative_file_path)
-                        
-                        # Sort for consistent order
-                        image_files_to_show.sort()
-                        
-                    except Exception as e:
-                        print(f"❌ Error reading image directory {image_path}: {e}")
-                        desc += f"📁 Error reading folder: {relative_path}"
-                        return desc
-                        
-                elif os.path.isfile(image_path):
-                    # Single image file
-                    filename = os.path.basename(image_path)
-                    relative_file_path = f"{relative_path}/{filename}"
-                    image_files_to_show = [relative_file_path]
-                else:
-                    desc += f"📁 Path not found: {relative_path}"
-                    return desc
-                
-                # Only call gallery if we have images
-                if image_files_to_show:
-                    gallery_result = self._create_image_gallery(image_files_to_show, hobby['name'])
-                    desc += gallery_result
-                else:
-                    desc += f"📁 No images found in: {relative_path}"
-                    
+                full_path = image_path  # Use the absolute path for file operations
+            elif image_path.startswith("/static/assets/"):
+                # Relative path starting with /static/assets/
+                relative_path = image_path.replace("/static/assets/", "")
+                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+            elif image_path.startswith("/assets/"):
+                # Relative path starting with /assets/
+                relative_path = image_path.replace("/assets/", "")
+                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
             else:
-                # Fallback for other path formats
+                # Unsupported path format
                 desc += f"📷 Images: {image_path}"
+                return desc
+            
+            # Initialize empty list for image files
+            image_files_to_show = []
+            
+            # Check if it's a directory with multiple images
+            if os.path.isdir(full_path):
+                # Get all image files from the directory
+                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+                
+                try:
+                    for filename in os.listdir(full_path):
+                        if any(filename.lower().endswith(ext) for ext in image_extensions):
+                            relative_file_path = f"{relative_path}/{filename}"
+                            image_files_to_show.append(relative_file_path)
+                    
+                    # Sort for consistent order
+                    image_files_to_show.sort()
+                    
+                except Exception as e:
+                    print(f"❌ Error reading image directory {full_path}: {e}")
+                    desc += f"📁 Error reading folder: {relative_path}"
+                    return desc
+                    
+            elif os.path.isfile(full_path):
+                # Single image file
+                filename = os.path.basename(full_path)
+                relative_file_path = f"{relative_path}/{filename}"
+                image_files_to_show = [relative_file_path]
+            else:
+                desc += f"📁 Path not found: {relative_path}"
+                return desc
+            
+            # Only call gallery if we have images
+            if image_files_to_show:
+                gallery_result = self._create_image_gallery(image_files_to_show, hobby['name'])
+                desc += gallery_result
+            else:
+                desc += f"📁 No images found in: {relative_path}"
 
         return desc
     
