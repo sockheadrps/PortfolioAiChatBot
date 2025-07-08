@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Project Submission</title>
+  <script>
+    let notesList = [];
+
+    function updatePreview() {
+      const name = document.getElementById("name").value;
+      const description = document.getElementById("description").value;
+      const skills = document.getElementById("skills").value.split(",").map(s => s.trim());
+      const code_url = document.getElementById("code_url").value;
+      const image = document.getElementById("image").value;
+
+      const preview = {
+        name,
+        description,
+        skills,
+        code_url,
+        image,
+        notes: notesList
+      };
+
+      document.getElementById("notes-json").value = JSON.stringify(notesList);
+      document.getElementById("json-preview").textContent = JSON.stringify(preview, null, 2);
+    }
+
+    function addNote() {
+      const noteInput = document.getElementById("note");
+      const note = noteInput.value.trim();
+      if (note) {
+        notesList.push(note);
+        noteInput.value = "";
+        updatePreview();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const inputs = document.querySelectorAll("input, textarea");
+      inputs.forEach(input => {
+        input.addEventListener("input", updatePreview);
+      });
+
+      document.getElementById("add-note-btn").addEventListener("click", (e) => {
+        e.preventDefault();
+        addNote();
+      });
+
+      updatePreview(); // Initialize preview
+    });
+  </script>
+</head>
+<body>
+  <h1>Submit New Project</h1>
+  <form action="/submit" method="post">
+    <label>Name:<br><input type="text" name="name" id="name" required></label><br><br>
+    <label>Description:<br><textarea name="description" id="description" required></textarea></label><br><br>
+    <label>Skills (comma-separated):<br><input type="text" name="skills" id="skills" required></label><br><br>
+    <label>Code URL:<br><input type="url" name="code_url" id="code_url" required></label><br><br>
+    <label>Image Path:<br><input type="text" name="image" id="image" value="assets/" required></label><br><br>
+
+    <label>Note:<br><input type="text" id="note"></label>
+    <button id="add-note-btn">Set Note</button><br><br>
+
+    <input type="hidden" name="notes" id="notes-json">
+
+    <button type="submit">Save</button>
+  </form>
+
+  <h2>Live JSON Preview</h2>
+  <pre id="json-preview" style="background:#f4f4f4; padding:1em; border:1px solid #ccc;"></pre>
+</body>
+</html>

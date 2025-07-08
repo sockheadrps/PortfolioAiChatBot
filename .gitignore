@@ -28,4 +28,8 @@ chat.db
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Portfolio Assistant Cache
+.portfolio_cache/
+*.pkl 

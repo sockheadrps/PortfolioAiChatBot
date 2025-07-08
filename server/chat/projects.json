@@ -1,0 +1,116 @@
+[{
+  "name": "FastAPI WebSocket Chat App",
+  "description": "A modern real-time chat application built with FastAPI, WebSockets, SQLite, and vanilla JS, with full authentication and dynamic user interactions.",
+  "type": "software",
+  "skills": [
+    "FastAPI",
+    "WebSockets",
+    "Authentication",
+    "SQLite",
+    "JWT",
+    "Passlib",
+    "Bcrypt",
+    "RSA",
+    "Pydantic",
+    "Jinja2",
+    "SQLAlchemy",
+    "JavaScript"
+  ],
+  "code_url": "https://github.com/sockheadrps/your-chat-app-repo",  
+  "notes": [
+    "Implemented token-based authentication using JWT and secure cookies.",
+    "Encrypted private messages using RSA-OAEP end-to-end encryption.",
+    "Used FastAPI and WebSocket for real-time communication between clients.",
+    "Designed modular structure with separate auth, chat, and utility components.",
+    "Handled message validation and serialization with Pydantic.",
+    "Integrated Jinja2 for rendering templates and vanilla JS for frontend logic."
+  ]
+},
+
+{
+  "name": "Palindrome Detection",
+  "description": "Built a custom NLP pipeline to classify palindromes with 99.88% accuracy using progressively refined models (LSTM → GRU → Transformer). Augmented the dataset with contrastive examples including near-palindromes and deceptive symmetric patterns. Also configured and trained an open-source voice cloning toolchain tailored for livestream integration.",
+  "type": "software",
+  "skills": [
+    "Python",
+    "NLP",
+    "TensorFlow/Keras",
+    "LSTM",
+    "GRU",
+    "Transformer",
+    "Data Augmentation",
+    "Model Training",
+    "Contrastive Examples",
+    "Active Learning",
+    "Automation"
+  ],
+  "code_url": "https://github.com/sockheadrps/PalindromeTransformerClassifier",
+  "notes": [
+    "Implemented a data generator that creates real, near, and deceptive non-palindromes using symmetry-breaking rules.",
+    "Used `make_double_letter_non_palindrome` to create examples with repeated letters, which the model struggled with early on.",
+    "Added `make_partial_mirror_non_palindrome` and `make_symetrical_non_palindrome` to confuse symmetry-biased classifiers.",
+    "Moved from LSTM to GRU to Transformer architectures for faster training and better generalization.",
+    "Final model misclassified only 1 out of 800 curated examples.",
+    "Automatically retrains the model using high-confidence false positives from test runs, logging them to `hard_negatives.txt` and injecting them into the dataset on next startup.",
+    "This retraining loop acts as a feedback mechanism to continuously harden the classifier against edge cases."
+  ]
+},
+{
+  "name": "rpaudio",
+  "description": "Rust-based Python library for non-blocking audio playback with a simple and intuitive API. Designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.",
+  "type": "software",
+  "skills": [
+    "Rust",
+    "Python",
+    "PyO3",
+    "Concurrency",
+    "AsyncIO",
+    "Audio Processing",
+    "Threading",
+    "FFmpeg",
+    "Library Design",
+    "Cross-Platform"
+  ],
+  "code_url": "https://github.com/sockheadrps/rpaudio",
+  "notes": [
+  "I created rpaudio to bridge Rust’s performance and concurrency guarantees with Python’s ease of use, especially in async applications.",
+  "It offers non-blocking audio playback via `AudioSink`, dynamic audio effect processing through `AudioChannel`, and multi-channel coordination with `ChannelManager`.",
+  "Supports audio formats including MP3, WAV, FLAC, and Vorbis.",
+  "Exposes a clean Python API for both playback control and metadata access.",
+  "Designed to simplify integration compared to PyAudio, while avoiding blocking the main thread.",
+  "Ideal for responsive and real-time Python applications requiring audio control."
+]
+
+},
+{
+  "name":   "PyProfileDataGen – GitHub Profile Insights & Visualizer",
+  "description": "Automatically enhance your GitHub profile with real-time visual analytics of your Python repositories. This tool runs via GitHub Actions to generate and append statistics and graphs to your README on every push, with no manual updates required.",
+  "type": "software",
+  "skills": [
+    "Python",
+    "GitHub Actions",
+    "Data Visualization",
+    "Plotly",
+    "Pandas",
+    "Matplotlib",
+    "Regex",
+    "GitHub API",
+    "Automation",
+    "Heatmaps",
+    "Word Clouds"
+  ],
+  "code_url": "https://github.com/sockheadrps/PyProfileDataGen",
+  "notes": [
+    "Parses all Python repositories in your GitHub profile to extract detailed metrics such as line counts, constructs used, and libraries imported.",
+    "Generates bar graphs, line charts, heatmaps, and word clouds using Plotly and Matplotlib.",
+    "Visualizations include commit activity by time/day, file type usage, construct counts (loops, functions, control flow, etc.), and recent commits/PRs.",
+    "All charts are compiled into an animated GIF to reduce visual clutter in the README.",
+    "Appends new data at the bottom of your README while preserving the rest of your content.",
+    "Workflow runs automatically through GitHub Actions on every push to the main branch.",
+    "Designed for Python devs who want an automated way to keep their GitHub profile informative and visually appealing without manual updates."
+  ]
+}
+
+
+]
+

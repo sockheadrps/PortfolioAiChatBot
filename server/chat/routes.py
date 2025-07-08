@@ -2,6 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPExcept
 from jose import jwt, JWTError
 from typing import List
 import json
+import asyncio
 from pydantic import ValidationError
 from server.chat.manager import ConnectionManager
 from server.auth.auth import SECRET_KEY, ALGORITHM
@@ -13,6 +14,51 @@ from server.chat.bot_user import initialize_bot, get_bot
 router = APIRouter()
 manager = ConnectionManager()
 private_manager = PrivateConnectionManager()
+
+
+async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager):
+    """Handle bot responses to public chat messages"""
+    import asyncio
+    
+    message_lower = message.lower()
+    
+    # Only respond to @bot mentions
+    if '@bot' in message_lower:
+        try:
+            # Send typing indicator
+            await manager.broadcast(json.dumps({
+                "event": "bot_typing",
+                "data": {
+                    "user": bot.username,
+                    "typing": True
+                }
+            }))
+            
+            # Add delay to make it feel more natural
+            await asyncio.sleep(1.5)
+            
+            # Generate bot response using portfolio assistant
+            bot_response = bot.portfolio_assistant.get_response(message)
+            
+            # Broadcast bot response
+            await manager.broadcast(json.dumps({
+                "event": "chat_message",
+                "data": {
+                    "user": bot.username,
+                    "message": bot_response
+                }
+            }))
+            
+        except Exception as e:
+            print(f"❌ Error generating bot response: {e}")
+            # Send a fallback response
+            await manager.broadcast(json.dumps({
+                "event": "chat_message", 
+                "data": {
+                    "user": bot.username,
+                    "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+                }
+            }))
 
 
 @router.post("/chat")
@@ -50,13 +96,22 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             msg_type = data.get("type")
 
             if msg_type == "chat_message":
+                message_text = data["data"]["message"]
+                
+                # Broadcast the user's message
                 await manager.broadcast(json.dumps({
                     "event": "chat_message",
                     "data": {
                         "user": username,
-                        "message": data["data"]["message"]
+                        "message": message_text
                     }
                 }))
+                
+                # Check if bot should respond to public message
+                bot = get_bot()
+                if bot and username != bot.username:
+                    # Start bot response handling in background (don't await)
+                    asyncio.create_task(_handle_bot_public_response(bot, username, message_text, manager))
 
             elif msg_type == "pm_invite":
                 recipient = data.get("to")

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "AWS Data Center UPS & Power Infrastructure",
+    "type": "electrical",
+    "description": "Installed and commissioned critical power infrastructure across AWS data centers, including UPS battery racks, addressed distribution cabling, generator interconnects, and final commissioning of bus duct systems during load bank testing.",
+    "skills": [
+      "Power Distribution",
+      "UPS Systems",
+      "Battery Modules",
+      "Generator Systems",
+      "ATS",
+      "Commissioning",
+      "Load Bank Testing",
+      "NFPA 70E",
+      "Redundancy Design",
+      "Cable Management"
+    ],
+    "code_url": "",
+    "image": "assets/aws_ups_commissioning.jpg",
+    "notes": [
+      "Installed and configured UPS battery racks, including addressable modules and secure cable routing.",
+      "Distributed high-amperage addressed cables from UPS racks to server cabinets and switchboards.",
+      "Ran and terminated communication lines between ATS, switchgear, and generator systems for central monitoring.",
+      "Supported final commissioning with QA and safety checks of electrical bus duct across data halls.",
+      "Participated in load bank testing to validate real-world failover and load handling behavior.",
+      "Ensured all work was compliant with NFPA 70E and local AHJ requirements for energized equipment."
+    ]
+  },
+  {
+    "name": "Servo Press Assembly & Retrofit – AIDA America",
+    "type": "electrical",
+    "description": "Worked as a subcontractor for AIDA America assembling and retrofitting servo-controlled metal forming presses ranging from 200 to 4,000 metric tons. Involved in both in-house press manufacturing and on-site retrofitting for operational customer presses.",
+    "skills": [
+      "Servo Systems",
+      "PLC Integration",
+      "Press Commissioning",
+      "Sensor Wiring",
+      "Industrial Retrofit",
+      "Cable Routing",
+      "QA Testing",
+      "ISO 9001:2015 Compliance",
+      "Electrical Schematics",
+      "Problem Solving"
+    ],
+    "code_url": "",
+    "image": "assets/aida_servo_press.jpg",
+    "notes": [
+      "Installed and routed communication cables between sensors, control modules, and safety systems according to complex engineered schematics.",
+      "Planned around hydraulic, mechanical, and operational constraints to execute clean, reliable electrical runs in high-density equipment.",
+      "Worked on presses rated up to 4,000 metric tons in an ISO 9001:2015 certified manufacturing environment.",
+      "Participated in full testing and QA analysis for completed servo presses prior to shipment.",
+      "Traveled on-site to customer factories to retrofit legacy mechanical presses with modern PLCs and updated safety interlocks — often in live production settings.",
+      "Collaborated closely with mechanical and hydraulic teams to ensure full system integration and production-readiness."
+    ]
+  },
+  {
+    "name": "Electrical QA & Infrared Inspection – TEGG Representative",
+    "type": "electrical",
+    "description": "Performed quality assurance and third-party verification for critical electrical systems using thermal imaging, ultrasonic testing, and mechanical inspection. Worked with a regional TEGG representative to assess and document the condition of transformers, motors, and conductor terminations for clients in hospitals, factories, and mission-critical environments.",
+    "skills": [
+      "Electrical QA",
+      "Thermal Imaging",
+      "Ultrasonic Testing",
+      "Predictive Maintenance",
+      "Transformer Inspection",
+      "TEGG Protocols",
+      "Third-Party Verification",
+      "Power Systems",
+      "Risk Analysis",
+      "Field Reporting"
+    ],
+    "code_url": "",
+    "image": "assets/tegg_qa_inspection.jpg",
+    "notes": [
+      "Executed electrical system inspections using infrared, ultrasonic, and mechanical testing equipment per TEGG standards.",
+      "Assessed the condition of power distribution equipment, including conductors, switchgear, transformers, and motors.",
+      "Collected and documented diagnostic data to support predictive maintenance and risk mitigation plans for insurance-backed guarantees.",
+      "Performed third-party installation verification for external clients seeking QA of work performed by other electrical contractors.",
+      "Worked in environments with strict uptime requirements, including manufacturing plants and healthcare facilities.",
+      "Produced QA reports and analysis for client delivery, supporting compliance, warranty, and operational reliability decisions."
+    ]
+  },
+  {
+    "name": "Hyperscale Data Center Electrical Maintenance",
+    "type": "electrical",
+    "description": "Maintained and serviced critical electrical systems for hyperscale data centers, including ATS units, backup generators, inverters, and power distribution infrastructure. Specialized in redundant failover systems designed for mission-critical uptime and multi-megawatt loads.",
+    "skills": [
+      "Power Distribution",
+      "ATS",
+      "Redundant Systems",
+      "3-Phase Power",
+      "Backup Generators",
+      "Relay-Controlled Systems",
+      "High-Current Subpanels",
+      "Transformers",
+      "Confidence Testing",
+      "Mission-Critical Uptime"
+    ],
+    "code_url": "",
+    "image": "assets/hyperscale_maintenance.jpg",
+    "notes": [
+      "Maintained and serviced ATS, inverters, power monitoring, and air quality measurement infrastructure in hyperscale data centers.",
+      "Installed and maintained high-current 3-phase subpanels, transformers, and building-wide electrical infrastructure exceeding 10MW.",
+      "Specialized in supporting failover systems with zero-downtime requirements for mission-critical operations.",
+      "Performed monthly confidence testing and inspections of redundant power systems and backup generators.",
+      "Worked on relay-based control logic for automatic transfer switching and load balancing.",
+      "Ensured safe and compliant operations of high-reliability infrastructure supporting industrial-grade compute loads."
+    ]
+  }
+]

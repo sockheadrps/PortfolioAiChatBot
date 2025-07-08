@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes, serialization
 from server.chat.manager import ConnectionManager
 from server.chat.private_manager import PrivateConnectionManager
+from server.chat.portfolio_assistant import PortfolioAssistant
 from server.utils.models import (
     PmAcceptMessage, PmTextMessage, PubkeyRequestMessage, PubkeyResponseMessage
 )
@@ -48,6 +49,10 @@ class ChatBot:
         self.public_key_pem = None
         self.user_public_keys: Dict[str, bytes] = {}  # Store other users' public keys
         
+        # Initialize Portfolio Assistant for intelligent responses
+        print(f"🤖 Initializing Optimized Portfolio Assistant for {username}...")
+        self.portfolio_assistant = PortfolioAssistant("server/chat/projects.json")
+        
         # Generate RSA key pair for the bot
         self._generate_key_pair()
         
@@ -72,10 +77,10 @@ class ChatBot:
         
         # Greeting messages for new conversations
         self.greetings = [
-            "Hi there! I'm ChatBot, your friendly AI companion. What's on your mind today?",
-            "Hello! Nice to meet you! I'm always here for a chat. How are you doing?",
-            "Hey! Thanks for starting a conversation with me. What would you like to talk about?",
-            "Hi! I'm ChatBot, and I'm here to chat whenever you need. What's up?",
+            "Hi there! I'm ChatBot, your AI assistant. I can tell you about Ryan's projects, skills, and development experience, or just chat about anything. What's on your mind today?",
+            "Hello! Nice to meet you! I'm here to discuss technical projects, programming skills, or have a casual chat. How are you doing?",
+            "Hey! Thanks for starting a conversation with me. I'd love to share information about development work, projects, or just chat about whatever interests you!",
+            "Hi! I'm ChatBot, and I can help you learn about software projects, technologies, and development experience. Feel free to ask me anything!"
         ]
     
     def _generate_key_pair(self):
@@ -164,9 +169,32 @@ class ChatBot:
         # Add the user's message to conversation history
         self.active_conversations[user].append(f"{user}: {message}")
         
-        # Simple keyword-based responses for more engaging conversation
         message_lower = message.lower()
         
+        # Check if this is a portfolio/technical question
+        portfolio_keywords = [
+            'project', 'projects', 'work', 'experience', 'skills', 'technologies', 'tech',
+            'programming', 'development', 'built', 'created', 'developed', 'portfolio',
+            'background', 'python', 'javascript', 'web', 'app', 'application', 'software',
+            'code', 'coding', 'developer', 'engineer', 'ai', 'machine learning', 'ml',
+            'react', 'node', 'database', 'api', 'frontend', 'backend', 'fullstack',
+            'github', 'what can you do', 'tell me about', 'show me', 'examples',
+            'fastapi', 'websocket', 'three.js', 'encryption', 'chat', 'e-commerce',
+            'docker', 'stripe', 'mongodb', 'express', 'typescript', 'next.js',
+            'scikit-learn', 'pandas', 'numpy', 'matplotlib', 'jupyter', 'data',
+            'analytics', 'model', 'algorithm', 'css', 'html', 'responsive'
+        ]
+        
+        # Use Portfolio Assistant for technical/portfolio questions
+        if any(keyword in message_lower for keyword in portfolio_keywords):
+            try:
+                portfolio_response = self.portfolio_assistant.get_response(message)
+                return portfolio_response
+            except Exception as e:
+                print(f"❌ Error getting portfolio response: {e}")
+                # Fall back to general response if portfolio assistant fails
+        
+        # Handle general conversation with keyword-based responses
         if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
             return "Hello! It's great to hear from you again! How are you doing?"
         elif any(word in message_lower for word in ['bye', 'goodbye', 'see you', 'farewell']):
@@ -174,7 +202,7 @@ class ChatBot:
         elif any(word in message_lower for word in ['thank', 'thanks', 'thx']):
             return "You're very welcome! I'm happy I could help. Is there anything else you'd like to talk about?"
         elif any(word in message_lower for word in ['help', 'assistance', 'support']):
-            return "I'd be happy to help! While I'm just a chat bot, I'm here to listen and chat with you. What's on your mind?"
+            return "I'd be happy to help! I can tell you about projects, skills, and development experience, or just chat. What's on your mind?"
         elif any(word in message_lower for word in ['how are you', 'how do you feel', 'what\'s up']):
             return "I'm doing great, thank you for asking! I'm always excited to have new conversations. How about you?"
         elif any(word in message_lower for word in ['sad', 'upset', 'frustrated', 'angry', 'depressed']):
@@ -182,7 +210,7 @@ class ChatBot:
         elif any(word in message_lower for word in ['happy', 'excited', 'great', 'awesome', 'wonderful']):
             return "That's wonderful to hear! I love when people share positive news. What's making you so happy?"
         elif '?' in message:
-            return "That's a great question! I wish I had all the answers, but I'd love to hear your thoughts on it."
+            return "That's a great question! I wish I had all the answers, but I'd love to hear your thoughts on it. Feel free to ask about projects or tech too!"
         else:
             # Return a random response for general conversation
             return random.choice(self.responses)

@@ -17,6 +17,7 @@ const elements = {
   privateChatBox: document.getElementById('private-chat-box'),
   privateChatClose: document.getElementById('close-private-chat'),
   privateChatMinimize: document.getElementById('minimize-private-chat'),
+  privateChatMaximize: document.getElementById('maximize-private-chat'),
   privateChatDisconnect: document.getElementById('disconnect-private-chat'),
   privateInput: document.getElementById('private-input'),
   privateSendBtn: document.getElementById('private-send-btn'),
@@ -196,6 +197,43 @@ const messageHandler = {
     utils.scrollToBottom(container);
   },
 
+  showTypingIndicator: (container, botName = 'ChatBot') => {
+    // Remove any existing typing indicator
+    messageHandler.hideTypingIndicator(container);
+
+    const typingDiv = utils.createElement('div', 'typing-indicator');
+    typingDiv.id = 'bot-typing-indicator';
+    typingDiv.innerHTML = `
+      <div class="typing-dots">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+      <span class="typing-text">${botName} is thinking...</span>
+    `;
+    container.appendChild(typingDiv);
+    utils.scrollToBottom(container);
+  },
+
+  hideTypingIndicator: (container) => {
+    const typingIndicator = container.querySelector('#bot-typing-indicator');
+    if (typingIndicator) {
+      typingIndicator.remove();
+    }
+  },
+
+  addPrivateMessage: (container, user, message) => {
+    // Determine if this is a sent or received message
+    const messageClass = user === currentUsername ? 'sent' : 'received';
+    const msgDiv = utils.createElement('div', `message ${messageClass}`);
+    msgDiv.innerHTML = `
+      <span class="user-name">${user}</span>
+      <span class="message-text">${message}</span>
+    `;
+    container.appendChild(msgDiv);
+    utils.scrollToBottom(container);
+  },
+
   addSystemMessage: (container, message) => {
     const msgDiv = utils.createElement('div', 'message system');
     msgDiv.innerHTML = message;
@@ -208,9 +246,21 @@ const messageHandler = {
 const socketHandlers = {
   chat_message: (data) => {
     if (elements.messages) {
-      messageHandler.addMessage(elements.messages, data.user, data.message);
+      // Hide typing indicator when any message arrives
+      messageHandler.hideTypingIndicator(elements.messages);
+
+      // Add the message with appropriate styling
+      const messageClass =
+        data.user === 'ChatBot' ? 'bot' : data.user === 'System' ? 'system' : 'user';
+      messageHandler.addMessage(elements.messages, data.user, data.message, messageClass);
     } else {
       console.error('Messages element not found!');
+    }
+  },
+
+  bot_typing: (data) => {
+    if (elements.messages && data.typing) {
+      messageHandler.showTypingIndicator(elements.messages, data.user);
     }
   },
 
@@ -239,11 +289,11 @@ const socketHandlers = {
   pm_message: async (data) => {
     try {
       const decryptedMessage = await utils.decrypt(data.ciphertext);
-      messageHandler.addMessage(elements.privateChatBox, data.from, decryptedMessage);
+      messageHandler.addPrivateMessage(elements.privateChatBox, data.from, decryptedMessage);
       openPrivateChat(data.from);
     } catch (error) {
       console.error('Error handling PM message:', error);
-      messageHandler.addMessage(
+      messageHandler.addPrivateMessage(
         elements.privateChatBox,
         data.from,
         '[Encrypted message - decryption failed]'
@@ -318,7 +368,8 @@ const socketHandlers = {
 
 // WebSocket setup
 function setupSocket() {
-  socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
+  socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+  // socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
 
   socket.addEventListener('open', () => {
     elements.form.style.pointerEvents = 'auto';
@@ -463,7 +514,7 @@ function openPrivateChat(user) {
     );
   } else {
     messages.forEach(({ from, text }) => {
-      messageHandler.addMessage(elements.privateChatBox, from, text);
+      messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
     });
   }
 
@@ -493,7 +544,7 @@ async function sendPrivateMessage() {
           ciphertext,
         })
       );
-      messageHandler.addMessage(elements.privateChatBox, currentUsername, msg);
+      messageHandler.addPrivateMessage(elements.privateChatBox, currentUsername, msg);
       elements.privateInput.value = '';
     } catch (error) {
       console.error('Error sending private message:', error);
@@ -533,6 +584,30 @@ function minimizePrivateChat() {
   const chatUserName = document.getElementById('chat-user-name');
   if (chatUserName) {
     chatUserName.textContent = '';
+  }
+}
+
+function maximizePrivateChat() {
+  const container = elements.privateChatContainer;
+  const button = elements.privateChatMaximize;
+  const svg = button.querySelector('svg');
+
+  if (container.classList.contains('maximized')) {
+    // Restore to normal size
+    container.classList.remove('maximized');
+    button.title = 'Maximize';
+    svg.innerHTML = `
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <polyline points="8,8 16,8 16,16" />
+    `;
+  } else {
+    // Maximize
+    container.classList.add('maximized');
+    button.title = 'Restore';
+    svg.innerHTML = `
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <rect x="8" y="8" width="10" height="10" rx="1" ry="1" />
+    `;
   }
 }
 
@@ -693,7 +768,7 @@ function switchToPmChat(user) {
     );
   } else {
     messages.forEach(({ from, text }) => {
-      messageHandler.addMessage(elements.privateChatBox, from, text);
+      messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
     });
   }
   if (document.getElementById(`pm-tab-${user}`)?.classList.contains('disconnected')) {
@@ -718,7 +793,7 @@ socketHandlers.pm_message = async (data) => {
     pmSessions.get(from).push({ from, text: msg });
 
     if (currentPmUser === from) {
-      messageHandler.addMessage(elements.privateChatBox, from, msg);
+      messageHandler.addPrivateMessage(elements.privateChatBox, from, msg);
     } else {
       // Flash tab to indicate new message
       const tab = document.getElementById(`pm-tab-${from}`);
@@ -731,7 +806,7 @@ socketHandlers.pm_message = async (data) => {
   } catch (error) {
     console.error('Error handling PM message:', error);
     if (currentPmUser === from) {
-      messageHandler.addMessage(
+      messageHandler.addPrivateMessage(
         elements.privateChatBox,
         from,
         '[Encrypted message - decryption failed]'
@@ -820,6 +895,7 @@ window.addEventListener('DOMContentLoaded', () => {
   elements.privateSendBtn.addEventListener('click', sendPrivateMessage);
   elements.privateChatClose.addEventListener('click', closePrivateChat);
   elements.privateChatMinimize.addEventListener('click', minimizePrivateChat);
+  elements.privateChatMaximize.addEventListener('click', maximizePrivateChat);
   elements.privateChatDisconnect.addEventListener('click', disconnectPrivateChat);
   elements.privateInput.addEventListener('keypress', handlePrivateInputKeyPress);
 
@@ -873,4 +949,272 @@ elements.form.addEventListener('submit', (e) => {
     );
     elements.input.value = '';
   }
+});
+
+// Three.js Interactive Background System
+const backgroundSystem = {
+  scene: null,
+  camera: null,
+  renderer: null,
+  particles: [],
+  particleMaterials: [],
+  mouseX: 0,
+  mouseY: 0,
+  isEnabled: false,
+  colorPalette: [
+    new THREE.Color(1, 0.42, 0.42), // Red
+    new THREE.Color(1, 0.65, 0), // Orange
+    new THREE.Color(1, 1, 0), // Yellow
+    new THREE.Color(0.2, 0.8, 0.2), // Green
+    new THREE.Color(1, 1, 1), // White
+    new THREE.Color(1, 0.8, 0), // Gold
+    new THREE.Color(1, 0.08, 0.58), // Pink
+    new THREE.Color(0, 1, 1), // Cyan
+  ],
+  maxDistance: 100,
+
+  init() {
+    try {
+      this.setupThreeJS();
+      this.createParticles();
+      this.addEventListeners();
+      this.isEnabled = true;
+      this.startRenderLoop();
+    } catch (error) {
+      console.error('Error initializing background system:', error);
+    }
+  },
+  setupThreeJS() {
+    // Create scene
+    this.scene = new THREE.Scene();
+
+    // Create perspective camera for vertical depth effect
+    this.camera = new THREE.PerspectiveCamera(
+      40, // field of view
+      window.innerWidth / window.innerHeight,
+      0.1,
+      2000
+    );
+
+    // Position camera behind and slightly above the grid for vertical perspective
+    this.camera.position.set(0, 0, 400);
+    this.camera.lookAt(0, 0, 0);
+
+    // Tilt camera slightly down to enhance vertical perspective
+    this.camera.rotation.x = 0.1;
+
+    // Create renderer
+    this.renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.domElement.style.position = 'fixed';
+    this.renderer.domElement.style.top = '0';
+    this.renderer.domElement.style.left = '0';
+    this.renderer.domElement.style.zIndex = '-1';
+    this.renderer.domElement.style.pointerEvents = 'none';
+
+    document.body.appendChild(this.renderer.domElement);
+  },
+
+  createParticles() {
+    this.particles = [];
+    this.particleMaterials = [];
+
+    // Create a vertical grid with depth for up/down perspective effect
+    const gridWidth = 90; // Increased number of particles across
+    const gridHeight = 50; // Increased number of particles vertically
+    const spacingX = 15; // Reduced horizontal spacing
+    const spacingY = 15; // Reduced vertical spacing
+    const depthRange = 350; // How far back the grid extends
+    const baseSize = 1; // Original particle size
+
+    // Calculate grid bounds
+    const startX = -(gridWidth * spacingX) / 2;
+    const startY = -(gridHeight * spacingY) / 2;
+
+    for (let x = 0; x < gridWidth; x++) {
+      for (let y = 0; y < gridHeight; y++) {
+        // Calculate 3D position
+        const posX = startX + x * spacingX;
+        const posY = startY + y * spacingY;
+        // Map Y position to depth - REVERSED: higher Y = closer (bigger on screen)
+        // Lower Y = farther back (smaller on screen)
+        const depthProgress = (gridHeight - 1 - y) / (gridHeight - 1); // 1 to 0 (reversed)
+        // Push bottom particles much closer by using asymmetric depth mapping
+        const posZ = depthRange * (depthProgress - 0.8); // +70 to -280 (bottom much closer)
+
+        // Create material for this particle
+        const material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(1, 1, 1),
+          transparent: true,
+          opacity: 0.15,
+        });
+
+        // Create mesh
+        const geometry = new THREE.CircleGeometry(baseSize, 8);
+        const particle = new THREE.Mesh(geometry, material);
+
+        // Position particle in 3D space
+        particle.position.set(posX, posY, posZ);
+
+        // Store metadata including screen projection for mouse interaction
+        particle.userData = {
+          originalX: 0, // Will be updated during render
+          originalY: 0, // Will be updated during render
+          screenX: 0, // Will be updated during render
+          screenY: 0, // Will be updated during render
+          world3D: { x: posX, y: posY, z: posZ },
+          originalOpacity: 0.15,
+          originalSize: baseSize,
+          glowing: false,
+          targetOpacity: 0.15,
+          targetScale: 1,
+          targetColor: new THREE.Color(1, 1, 1),
+        };
+
+        this.scene.add(particle);
+        this.particles.push(particle);
+        this.particleMaterials.push(material);
+      }
+    }
+  },
+
+  addEventListeners() {
+    document.addEventListener('mousemove', (e) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+    });
+
+    window.addEventListener('resize', () => {
+      // Update perspective camera aspect ratio
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+      // No need to recreate particles since they're positioned in world space
+    });
+  },
+
+  clearParticles() {
+    this.particles.forEach((particle) => {
+      this.scene.remove(particle);
+      particle.geometry.dispose();
+      particle.material.dispose();
+    });
+    this.particles = [];
+    this.particleMaterials = [];
+  },
+
+  calculateDistance(x1, y1, x2, y2) {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  },
+
+  getColorFromDistance(distance) {
+    const timeOffset = Date.now() * 0.0002; // Much slower color cycling
+    const normalizedDistance = distance / this.maxDistance;
+    const colorIndex = Math.floor((timeOffset + normalizedDistance * 3) % this.colorPalette.length);
+    return this.colorPalette[colorIndex];
+  },
+
+  updateParticles() {
+    if (!this.isEnabled) return;
+
+    const time = Date.now() * 0.001; // Time in seconds for smooth animation
+
+    // Calculate uniform drift for all particles
+    const driftX = Math.sin(time * 0.25) * 8; // Up and right, then down and left (horizontal) - slower and smaller
+    const driftY = Math.cos(time * 0.25) * 6; // Up and right, then down and left (vertical) - slower and smaller
+    const driftZ = Math.sin(time * 0.2) * 3; // Gentle depth drift - slower and smaller
+
+    this.particles.forEach((particle, index) => {
+      // Apply uniform drift to all particles
+      const currentX = particle.userData.world3D.x + driftX;
+      const currentY = particle.userData.world3D.y + driftY;
+      const currentZ = particle.userData.world3D.z + driftZ;
+
+      // Update particle's actual position for rendering
+      particle.position.set(currentX, currentY, currentZ);
+
+      // Project 3D world position to 2D screen coordinates
+      const vector = new THREE.Vector3(currentX, currentY, currentZ);
+      vector.project(this.camera);
+
+      // Convert from normalized device coordinates (-1 to +1) to screen coordinates
+      const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+      // Update screen coordinates for mouse interaction
+      particle.userData.screenX = screenX;
+      particle.userData.screenY = screenY;
+
+      const distance = this.calculateDistance(this.mouseX, this.mouseY, screenX, screenY);
+
+      if (distance <= this.maxDistance) {
+        // Calculate glow effect for trail
+        const intensity = 1 - distance / this.maxDistance;
+        const glowColor = this.getColorFromDistance(distance);
+
+        particle.userData.glowing = true;
+        particle.userData.targetOpacity = particle.userData.originalOpacity + intensity * 1.2;
+        particle.userData.targetColor = glowColor;
+
+        // Set a fade-out timer for trail effect
+        particle.userData.lastGlowTime = Date.now();
+      } else {
+        // Check if particle should still be glowing from trail effect
+        const timeSinceGlow = Date.now() - (particle.userData.lastGlowTime || 0);
+        const trailDuration = 1500; // 1.5 seconds trail fade
+
+        if (timeSinceGlow < trailDuration) {
+          // Fade out gradually for trail effect
+          const fadeProgress = timeSinceGlow / trailDuration;
+          const trailIntensity = 1 - fadeProgress;
+          particle.userData.targetOpacity =
+            particle.userData.originalOpacity + trailIntensity * 0.8;
+          // Keep the color but fade it
+          particle.userData.targetColor = particle.userData.targetColor || new THREE.Color(1, 1, 1);
+        } else {
+          // Completely reset to original state
+          particle.userData.glowing = false;
+          particle.userData.targetOpacity = particle.userData.originalOpacity;
+          particle.userData.targetColor = new THREE.Color(1, 1, 1);
+        }
+      }
+
+      // Much slower interpolation for smoother, slower changes
+      const lerpSpeed = 0.02;
+      particle.material.opacity = THREE.MathUtils.lerp(
+        particle.material.opacity,
+        particle.userData.targetOpacity,
+        lerpSpeed
+      );
+
+      particle.material.color.lerp(particle.userData.targetColor, lerpSpeed);
+    });
+  },
+
+  startRenderLoop() {
+    const animate = () => {
+      if (this.isEnabled) {
+        this.updateParticles();
+        this.renderer.render(this.scene, this.camera);
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  },
+};
+
+// Initialize Three.js background after DOM is ready
+window.addEventListener('load', () => {
+  // Small delay to ensure everything is rendered
+  setTimeout(() => {
+    if (typeof THREE === 'undefined') {
+      console.error('Three.js not loaded! Background effects will not work.');
+      return;
+    }
+    backgroundSystem.init();
+  }, 500);
 });

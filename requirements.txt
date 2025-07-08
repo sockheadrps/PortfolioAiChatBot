@@ -5,3 +5,6 @@ python-jose
 passlib[bcrypt]
 jinja2
 cryptography
+sentence-transformers
+chromadb
+numpy
