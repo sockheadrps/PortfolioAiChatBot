@@ -371,8 +371,8 @@ const socketHandlers = {
 
 // WebSocket setup
 function setupSocket() {
-  socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
-  // socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
+  // socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+  socket = new WebSocket(`ws://chat.socksthoughtshop.lol:8118/ws?token=${token}`);
 
   socket.addEventListener('open', () => {
     elements.form.style.pointerEvents = 'auto';
