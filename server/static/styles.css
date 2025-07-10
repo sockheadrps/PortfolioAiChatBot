@@ -155,6 +155,10 @@ body {
   z-index: 1;
   display: flex;
   height: calc(100vh - 180px); /* Adjusted for PM footer */
+  height: calc(100dvh - 180px); /* Dynamic viewport height for mobile */
+  /* Safari fallback for vh issues */
+  min-height: calc(100vh - 180px);
+  min-height: calc(100dvh - 180px);
 }
 
 .main-container {
@@ -180,6 +184,7 @@ body {
   justify-content: center;
   z-index: 10;
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur); /* Safari support */
   transition: var(--transition);
 }
 
@@ -192,6 +197,7 @@ body {
 .connecting-overlay {
   z-index: 20;
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur); /* Safari support */
   background: rgba(0, 0, 0, 0.6);
 }
 
@@ -549,10 +555,40 @@ body {
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  border-top: 1px solid rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.1));
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: 0 0 10px 10px;
+  position: relative;
+}
+
+/* Add subtle gradient overlay to match color palette */
+#chat-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.03));
+  border-radius: 0 0 10px 10px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Add subtle inner glow to chat form */
+#chat-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border-radius: 0px 0px 10px 10px;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Bot Toggle Styling */
@@ -659,20 +695,36 @@ body {
 #message-input {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(102, 126, 234, 0.4);
   border-radius: 25px;
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.08));
   color: var(--text-white);
   font-size: 15px;
   outline: none;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: relative;
+}
+
+/* Add subtle inner glow to message input */
+#message-input::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.05));
+  border-radius: 25px;
+  pointer-events: none;
+  z-index: -1;
 }
 
 #message-input:focus {
   border-color: rgba(102, 126, 234, 0.8);
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.15));
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4), 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
   transform: translateY(-1px);
 }
 
@@ -1564,6 +1616,8 @@ body {
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  height: calc(60px + env(safe-area-inset-top, 0px));
 }
 
 .user-info {
@@ -1591,13 +1645,19 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   transition: var(--transition);
+  /* Prevent body scroll when modal is open */
+  overflow: hidden;
+  /* Safari specific fixes */
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-overlay.hidden {
@@ -2078,6 +2138,8 @@ body {
   .layout-container {
     height: calc(100vh - 140px);
     height: calc(100dvh - 140px);
+    top: env(safe-area-inset-top, 60px);
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
   }
 
   .main-container {
@@ -2233,6 +2295,8 @@ body {
 
   .header-bar {
     padding: 10px 15px;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    height: calc(60px + env(safe-area-inset-top, 0px));
   }
 
   .logged-in-text {
@@ -2306,6 +2370,8 @@ body {
   .layout-container {
     height: calc(100vh - 140px);
     height: calc(100dvh - 140px);
+    top: env(safe-area-inset-top, 60px);
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
   }
 
   .main-container {
@@ -2408,4 +2474,178 @@ body {
     width: 100%;
     max-width: 120px;
   }
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* Safari/iOS Specific Fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific fixes */
+  html,
+  body {
+    height: 100%;
+    min-height: 100%;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    /* Prevent layout shifts */
+    overflow-x: hidden;
+  }
+
+  /* Ensure layout is restored after modal closes */
+  body:not(.modal-open) {
+    overflow: auto;
+    position: static;
+    width: auto;
+    height: auto;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .layout-container {
+    position: fixed;
+    top: calc(60px + env(safe-area-inset-top, 0px));
+    left: 0;
+    right: 0;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    z-index: 1;
+    display: flex;
+    height: calc(100vh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    min-height: calc(
+      100vh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  #chat-container {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    max-width: 85%;
+    width: 85%;
+    margin: 0 auto;
+  }
+
+  #users-panel {
+    background: rgba(255, 255, 255, 0.04);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  .modal-content {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  #pm-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(30, 30, 30, 0.95);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 1000;
+    height: 50px;
+  }
+
+  #chat-form {
+    position: relative;
+    background: rgba(255, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Fix for Safari viewport height issues */
+  @media screen and (max-width: 768px) {
+    .layout-container {
+      height: calc(
+        100vh - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+      );
+      min-height: calc(
+        100vh - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+      );
+    }
+
+    .main-container {
+      margin-left: 0;
+      padding: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    #chat-container {
+      max-width: 80%;
+      width: 80%;
+    }
+
+    #users-panel {
+      position: fixed;
+      left: 0;
+      top: calc(60px + env(safe-area-inset-top, 0px));
+      height: calc(100vh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      z-index: 1001;
+    }
+
+    /* Even smaller screens */
+    @media screen and (max-width: 480px) {
+      #chat-container {
+        max-width: 75%;
+        width: 75%;
+      }
+    }
+  }
+}
+
+/* Additional Safari backdrop-filter fallbacks */
+.glass-overlay,
+.connecting-overlay,
+#chat-container,
+#users-panel,
+.modal-content,
+#pm-footer,
+#chat-form {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.glass-overlay {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.connecting-overlay {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+#chat-container {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#users-panel {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.modal-content {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+#pm-footer {
+  background-color: rgba(30, 30, 30, 0.95);
+}
+
+#chat-form {
+  background-color: rgba(24, 24, 24, 0.98);
 }

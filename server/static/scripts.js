@@ -879,10 +879,12 @@ function toggleUsersPanel() {
 // Modal functions
 function showWelcomeModal() {
   elements.welcomeModal?.classList.remove('hidden');
+  document.body.classList.add('modal-open');
 }
 
 function hideWelcomeModal() {
   elements.welcomeModal?.classList.add('hidden');
+  document.body.classList.remove('modal-open');
 }
 
 function setupWelcomeModalHandlers() {
@@ -909,10 +911,12 @@ function setupWelcomeModalHandlers() {
 
 function showHelpModal() {
   elements.helpModal?.classList.remove('hidden');
+  document.body.classList.add('modal-open');
 }
 
 function hideHelpModal() {
   elements.helpModal?.classList.add('hidden');
+  document.body.classList.remove('modal-open');
 }
 
 function setupHelpModalHandlers() {
@@ -1194,7 +1198,11 @@ const backgroundSystem = {
         requestAnimationFrame(animate);
       }
     };
-    requestAnimationFrame(animate);
+    // Only start if not already running
+    if (!this.renderLoopStarted) {
+      this.renderLoopStarted = true;
+      requestAnimationFrame(animate);
+    }
   },
 };
 
