@@ -62,7 +62,7 @@ class ConnectionManager:
     async def send_welcome_message(self, websocket: WebSocket, username: str):
         """Send welcome messages to a newly connected user"""
         welcome_messages = [
-            "📢 Welcome to the chat! 📢",
+            "🤖Ask Bot Button: Toggle Functionality: The button switches between two modes: • ON (Active): Bot mode enabled - messages are sent to an AI assistant knowledgeable about the Ryans portfolio • OFF (Inactive): Regular chat mode - messages go to the public chat",
         ]
         
         for message_text in welcome_messages:

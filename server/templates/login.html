@@ -11,16 +11,18 @@
       <div class="chat-bubble">
         <div class="bubble-content">
           📢 General Chat: Messages exchanged in the general chat are not logged or saved by the
-          server but are unencrypted and visible to all users.
+          server but are unencrypted and visible to all users and the server.
         </div>
         <div class="system-label">System</div>
       </div>
       <div class="chat-bubble">
         <div class="bubble-content">
-          🔒 Private Messages: Messages exchanged in PMs are end-to-end encrypted with AES-256
-          encryption. The server cannot decrypt them and only you and the recipient can read these
-          messages.
+          🔒 Private Messages: Private messages use end-to-end encryption in the browser. Each
+          message is encrypted using the recipient’s RSA public key (RSA-OAEP with SHA-256), and
+          only the recipient can decrypt it with their private key. The server relays encrypted
+          messages but cannot read or decrypt them.
         </div>
+
         <div class="system-label">System</div>
       </div>
       <div class="chat-bubble">
