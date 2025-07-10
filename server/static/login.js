@@ -111,4 +111,29 @@ document.addEventListener('DOMContentLoaded', () => {
       errorDiv.textContent = err.message;
     }
   });
+
+  // Handle guest login
+  const guestButton = document.getElementById('guest-login-btn');
+  if (guestButton) {
+    guestButton.addEventListener('click', async (e) => {
+      e.preventDefault();
+      errorDiv.textContent = ''; // Clear any previous errors
+
+      try {
+        const res = await fetch('/guest-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.detail || 'Guest login failed');
+
+        // Redirect to homepage
+        window.location.href = '/';
+      } catch (err) {
+        errorDiv.textContent = err.message;
+      }
+    });
+  }
 });

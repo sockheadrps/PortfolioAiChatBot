@@ -25,16 +25,17 @@ async def _handle_bot_button_click(bot, username: str, message: str, manager: Co
         if bot_response and bot_response.strip():
             # Check if response contains gallery commands
             if "[GALLERY_SHOW|" in bot_response:
-                # Send gallery commands directly as a special event type that frontend can process silently
-                await manager.broadcast(json.dumps({
+                # Send gallery commands only to the user who clicked the button
+                await manager.send_to_user(username, {
                     "event": "gallery_commands",
                     "data": {
                         "user": bot.username,
                         "commands": bot_response
                     }
-                }))
+                })
             else:
                 # If it's not gallery commands, send as regular message (e.g., error messages)
+                # Error messages should be sent to everyone for context
                 await manager.broadcast(json.dumps({
                     "event": "chat_message",
                     "data": {
@@ -45,14 +46,14 @@ async def _handle_bot_button_click(bot, username: str, message: str, manager: Co
         
     except Exception as e:
         print(f"❌ Error handling button click: {e}")
-        # Send error message as regular chat
-        await manager.broadcast(json.dumps({
+        # Send error message as regular chat to the specific user who clicked
+        await manager.send_to_user(username, {
             "event": "chat_message",
             "data": {
                 "user": bot.username,
                 "message": "Sorry, I couldn't process that button click."
             }
-        }))
+        })
 
 
 async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager):
@@ -203,9 +204,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        is_guest = payload.get("is_guest", False)
+        
         if username is None:
             await websocket.close(code=1008)
             return
+        
+        # Both regular users and guests are allowed to connect
+        # Guest usernames will have "guest_" prefix to distinguish them
     except JWTError:
         await websocket.close(code=1008)
         return

@@ -44,9 +44,20 @@ PROMPT_CONFIG = {
     "CURRENT_STYLE": "default",
     
     "STYLES": {
-        "default": """You are Ryan's personal portfolio assistant. Respond with confidence and clarity and be concise, make sure your response includes facts from the context and not made up information.
+        "default": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience.
+
+IMPORTANT: Only respond to questions about:
+- Programming/software projects (Python, JavaScript, FastAPI, etc.)
+- Electrical engineering work (QA, manufacturing, AIDA press projects, TEGG work)
+- Hardware/hobby projects (PCBs, electronics, guitars, etc.)
+- Technical skills and professional experience
+- Development tools, technologies, and methodologies used
+
+For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics.
 
 For software/programming projects, include any available GitHub links if present in the context. For electrical, manufacturing, or hardware projects, focus on the technical skills and experience rather than code repositories.
+
+Use ONLY the facts provided in the context below. Do not make up information.
 
     Context:
     {context}
@@ -82,6 +93,9 @@ class PortfolioAssistant:
         self.db_dir = self.cache_dir / "chroma_db"
         # User-specific state management (per-user state)
         self.user_states = {}  # Dict[user_id, user_state]
+        
+        # Global image data for View Images button (shared across all users)
+        self.current_project_images = []
         
         try:
             print("🤖 Initializing Optimized Portfolio Assistant...")
@@ -296,8 +310,7 @@ class PortfolioAssistant:
         if user_id not in self.user_states:
             self.user_states[user_id] = {
                 "awaiting_hobby_choice": False,
-                "last_hobby_list": [],
-                "current_project_images": []
+                "last_hobby_list": []
             }
         return self.user_states[user_id]
 
@@ -330,8 +343,8 @@ class PortfolioAssistant:
                 
                 # Handle general project image viewing
                 elif button_id == "view_project_images":
-                    user_state = self.get_user_state(user_id)
-                    projects_with_images = user_state.get('current_project_images', [])
+                    # Use global image data instead of per-user data
+                    projects_with_images = self.current_project_images
                     
                     if not projects_with_images:
                         return "Sorry, no images are available for the current projects."
@@ -907,10 +920,9 @@ class PortfolioAssistant:
                                 'image': image_path
                             })
             
-            # Store image data in user state for button clicks
+            # Store image data globally for button clicks (shared across all users)
             if projects_with_images:
-                user_state = self.get_user_state(user_id)
-                user_state['current_project_images'] = projects_with_images
+                self.current_project_images = projects_with_images
             
             # Create context from matches
             context_parts = []
@@ -1035,6 +1047,23 @@ class PortfolioAssistant:
         
         import random
         return random.choice(fallbacks)
+
+    def _get_off_topic_response(self, query: str) -> str:
+        """Provide response when question is not portfolio-related."""
+        responses = [
+            "I'm Ryan's portfolio assistant, so I can only help with questions about his professional work, projects, and technical skills. Feel free to ask about his programming projects, electrical engineering work, or hobby builds!",
+            
+            "I specialize in discussing Ryan's technical expertise and projects. I'd be happy to tell you about his software development work, manufacturing experience, or electronics projects instead!",
+            
+            "That's outside my area - I focus on Ryan's portfolio and professional experience. Ask me about his Python projects, electrical QA work, or hardware builds!",
+            
+            "I'm here to discuss Ryan's technical work and projects. I can tell you about his programming skills, manufacturing experience, or hobby electronics - what interests you?",
+            
+            "I only cover Ryan's professional portfolio and technical projects. Try asking about his software development, electrical engineering work, or PCB designs!"
+        ]
+        
+        import random
+        return random.choice(responses)
     
     def get_response_stream(self, query: str, user_id: str = "default") -> Iterator[str]:
         """Main optimized method to get a streaming response to a query, with hobby handling."""
@@ -1045,9 +1074,8 @@ class PortfolioAssistant:
             yield button_result
             return
         
-        # Clear any old image data when starting a new query (not a button click)
-        user_state = self.get_user_state(user_id)
-        user_state['current_project_images'] = []
+        # Clear any old global image data when starting a new query (not a button click)
+        self.current_project_images = []
         
         if not self.projects:
             yield self._get_fallback_response(query)
@@ -1098,6 +1126,11 @@ class PortfolioAssistant:
             yield from self._predefined_software_projects()
             return
 
+        # Check if the query is portfolio-related before processing
+        if not self.is_portfolio_related(query):
+            yield self._get_off_topic_response(query)
+            return
+
         try:
             filter_type = self.infer_filter_type(query)
             print(f"[DEBUG] Filter type detected: {filter_type} for query: '{query}'")
@@ -1130,6 +1163,52 @@ class PortfolioAssistant:
             "4. **rpaudio**: A Rust-based Python library for non-blocking audio playback with a simple API, designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.\n"
             "https://github.com/sockheadrps/rpaudio"
         )
+
+    def is_portfolio_related(self, question: str) -> bool:
+        """Check if a question is related to portfolio topics (projects, skills, experience)."""
+        q = question.lower()
+        
+        # Portfolio-related keywords
+        portfolio_keywords = [
+            # General portfolio terms
+            "project", "projects", "work", "experience", "skill", "skills", "portfolio", "built", "developed", "created",
+            "technologies", "technology", "expertise", "background", "accomplishments", "achievements",
+            
+            # Programming/Software
+            "programming", "software", "python", "javascript", "code", "coding", "github", "api", "websocket", 
+            "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "app", "application", 
+            "development", "web", "fullstack", "framework", "database", "algorithm", "nlp", "machine learning",
+            "tensorflow", "keras", "rust", "pydantic", "jwt", "authentication", "encryption",
+            
+            # Electrical/Manufacturing
+            "electrical", "qa", "infrared", "tegg", "thermal", "ultrasonic", "power distribution", "voltage", 
+            "inspection", "manufacturing", "press", "assembly", "retrofit", "tonnage", "metric", "aida", 
+            "servo", "mechanical", "industrial", "production",
+            
+            # Hardware/Hobbies
+            "hardware", "hobby", "hobbies", "pcb", "etching", "soldering", "prototyping", "embedded", 
+            "microcontroller", "midi", "ble", "rgb", "led", "strip", "guitar", "overlay", "effects", 
+            "musical", "interface", "design", "electronics", "circuit", "van", "esp32", "controller",
+            
+            # Technical skills
+            "technical", "engineering", "architect", "design", "implementation", "testing", "debugging",
+            "optimization", "performance", "security", "scalability"
+        ]
+        
+        # Check if any portfolio keywords are present
+        if any(keyword in q for keyword in portfolio_keywords):
+            return True
+            
+        # Check for common question patterns about portfolio
+        portfolio_patterns = [
+            "what did", "what have", "tell me about", "show me", "can you", "how did", "what projects",
+            "what work", "what experience", "what skills", "what technologies", "what tools"
+        ]
+        
+        if any(pattern in q for pattern in portfolio_patterns):
+            return True
+            
+        return False
 
     def infer_filter_type(self, question: str) -> Optional[str]:
         """Infer whether the user is asking about electrical, software, or manufacturing projects."""

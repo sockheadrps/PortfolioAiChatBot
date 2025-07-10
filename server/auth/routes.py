@@ -35,6 +35,20 @@ async def register(form_data: OAuth2PasswordRequestForm = Depends(), db: Session
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token}
 
+@router.post("/guest-login")
+async def guest_login():
+    # Generate a unique guest username with timestamp
+    import uuid
+    import time
+    guest_id = str(uuid.uuid4())[:8]
+    guest_username = f"guest_{guest_id}_{int(time.time())}"
+    
+    # Create guest token (no database entry needed)
+    access_token = create_access_token(data={"sub": guest_username, "is_guest": True})
+    response = JSONResponse(content={"access_token": access_token, "username": guest_username})
+    response.set_cookie(key="access_token", value=access_token, httponly=False, max_age=3600)
+    return response
+
 @router.get("/logout")
 async def logout():
     response = RedirectResponse(url="/login")

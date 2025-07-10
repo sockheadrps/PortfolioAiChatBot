@@ -208,9 +208,57 @@ body {
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
 }
 
+/* Guest button styles */
+.guest-button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #28a745, #20c997);
+  border: 1px solid rgba(40, 167, 69, 0.4);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.guest-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.guest-button:hover::before {
+  left: 100%;
+}
+
+.guest-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.5);
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.9), rgba(32, 201, 151, 0.9));
+}
+
+.guest-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
 .register-section {
   text-align: center;
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* Chat Bubbles Animation */

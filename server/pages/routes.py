@@ -19,8 +19,13 @@ async def get_root_page(request: Request):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        is_guest = payload.get("is_guest", False)
+        
         if not username:
             raise JWTError()
+        
+        # Both regular users and guests are allowed to access the chat
+        # The username will include "guest_" prefix for guest users
     except JWTError:
         return RedirectResponse("/login")
 
