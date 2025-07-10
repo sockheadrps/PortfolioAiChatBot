@@ -83,7 +83,7 @@
 
 },
 {
-  "name":   "PyProfileDataGen – GitHub Profile Insights & Visualizer",
+  "name":   "PyProfileDataGen",
   "description": "Automatically enhance your GitHub profile with real-time visual analytics of your Python repositories. This tool runs via GitHub Actions to generate and append statistics and graphs to your README on every push, with no manual updates required.",
   "type": "software",
   "skills": [

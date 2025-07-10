@@ -70,6 +70,7 @@ const elements = {
   messages: document.getElementById('messages'),
   form: document.getElementById('chat-form'),
   input: document.getElementById('message-input'),
+  botToggle: document.getElementById('bot-toggle'),
   onlineUsers: document.getElementById('online-users'),
   connectingOverlay: document.getElementById('connecting-overlay'),
   logoutBtn: document.getElementById('logout-btn'),
@@ -250,6 +251,12 @@ const utils = {
 
 // Message handling
 const messageHandler = {
+  // Add URL linkification function
+  linkifyUrls: (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  },
+
   addMessage: (container, user, message, className = '') => {
     // Check for gallery commands before displaying message
     // Format: [GALLERY_SHOW|images||separated||by||pipes|title]
@@ -278,11 +285,31 @@ const messageHandler = {
       }
     }
 
+    // Process button commands inline
+    // Format: [BUTTON|button_id|button_text]
+    const buttonMatches = [...message.matchAll(/\[BUTTON\|([^|]+)\|([^|]+)\]/g)];
+
+    if (buttonMatches.length > 0) {
+      buttonMatches.forEach((match) => {
+        const [fullMatch, buttonId, buttonText] = match;
+
+        // Replace button command with actual button HTML inline
+        const buttonHtml = `<button class="chat-button" onclick="sendButtonClick('${buttonId}', '${buttonText}')">${buttonText}</button>`;
+        message = message.replace(fullMatch, buttonHtml);
+      });
+    }
+
+    // Linkify URLs in the message
+    message = messageHandler.linkifyUrls(message);
+
     const msgDiv = utils.createElement('div', `message ${className}`);
-    msgDiv.innerHTML = `
-      <span class="user-name">${user}</span>
-      <span class="message-text">${message}</span>
-    `;
+    const messageSpan = document.createElement('span');
+    messageSpan.className = 'message-text';
+    messageSpan.innerHTML = message; // Use innerHTML to render inline buttons and links
+
+    msgDiv.innerHTML = `<span class="user-name">${user}</span>`;
+    msgDiv.appendChild(messageSpan);
+
     container.appendChild(msgDiv);
     utils.scrollToBottom(container);
   },
@@ -315,18 +342,22 @@ const messageHandler = {
   addPrivateMessage: (container, user, message) => {
     // Determine if this is a sent or received message
     const messageClass = user === currentUsername ? 'sent' : 'received';
+    // Linkify URLs in private messages
+    const linkedMessage = this.linkifyUrls(message);
     const msgDiv = utils.createElement('div', `message ${messageClass}`);
     msgDiv.innerHTML = `
       <span class="user-name">${user}</span>
-      <span class="message-text">${message}</span>
+      <span class="message-text">${linkedMessage}</span>
     `;
     container.appendChild(msgDiv);
     utils.scrollToBottom(container);
   },
 
   addSystemMessage: (container, message) => {
+    // Linkify URLs in system messages
+    const linkedMessage = this.linkifyUrls(message);
     const msgDiv = utils.createElement('div', 'message system');
-    msgDiv.innerHTML = message;
+    msgDiv.innerHTML = linkedMessage;
     container.appendChild(msgDiv);
     utils.scrollToBottom(container);
   },
@@ -362,6 +393,8 @@ const messageHandler = {
       const messageText = streamingMessage.querySelector('.message-text');
       if (messageText) {
         let content = messageText.textContent;
+        let buttonsHtml = '';
+
         // Format: [GALLERY_SHOW|images||separated||by||pipes|title]
         const galleryMatch = content.match(/\[GALLERY_SHOW\|(.*?)\|([^|]+)\]/);
         if (galleryMatch) {
@@ -388,10 +421,27 @@ const messageHandler = {
               images.length > 1 ? 's' : ''
             } for ${title}`;
           }
-
-          // Update the message text
-          messageText.textContent = content;
         }
+
+        // Process button commands inline in streaming messages
+        // Format: [BUTTON|button_id|button_text]
+        const buttonMatches = [...content.matchAll(/\[BUTTON\|([^|]+)\|([^|]+)\]/g)];
+
+        if (buttonMatches.length > 0) {
+          buttonMatches.forEach((match) => {
+            const [fullMatch, buttonId, buttonText] = match;
+
+            // Replace button command with actual button HTML inline
+            const buttonHtml = `<button class="chat-button" onclick="sendButtonClick('${buttonId}', '${buttonText}')">${buttonText}</button>`;
+            content = content.replace(fullMatch, buttonHtml);
+          });
+        }
+
+        // Linkify URLs in the streaming message content
+        content = messageHandler.linkifyUrls(content);
+
+        // Update the message text with inline buttons and clickable links (use innerHTML to render)
+        messageText.innerHTML = content;
       }
 
       // Remove cursor and streaming class
@@ -485,7 +535,7 @@ const socketHandlers = {
     sendPublicKey(data.from);
   },
 
-  pubkey_response: async (data) => {  
+  pubkey_response: async (data) => {
     // Received someone's public key
     try {
       const publicKey = await utils.importPublicKey(data.public_key);
@@ -541,6 +591,32 @@ const socketHandlers = {
         'System',
         `${fromUser} has disconnected from your private chat.`
       );
+    }
+  },
+
+  gallery_commands: (data) => {
+    // Handle gallery commands from button clicks - process silently without showing text
+    if (data.commands) {
+      console.log('🔍 Processing gallery commands from button click:', data.commands);
+
+      // Process each gallery command without displaying text in chat
+      const galleryMatches = [...data.commands.matchAll(/\[GALLERY_SHOW\|(.*?)\|([^|]+)\]/g)];
+
+      galleryMatches.forEach((match) => {
+        const [fullMatch, imagesStr, title] = match;
+        console.log('🔍 Processing gallery command:', fullMatch);
+        console.log('🔍 Images string:', imagesStr);
+        console.log('🔍 Title:', title);
+
+        // Split images by || for multiple images, or use single image
+        const images = imagesStr.includes('||')
+          ? imagesStr.split('||').map((img) => img.trim())
+          : [imagesStr.trim()];
+        console.log('🔍 Parsed images:', images);
+
+        // Show the gallery silently (no chat message)
+        ImageGalleryController.showGallery(images, title);
+      });
     }
   },
 };
@@ -1167,8 +1243,16 @@ elements.form.addEventListener('submit', (e) => {
     return;
   }
 
-  const message = elements.input.value.trim();
+  let message = elements.input.value.trim();
   if (message && currentUsername) {
+    // Check if bot toggle is enabled and message doesn't already start with @bot
+    if (
+      elements.botToggle.classList.contains('active') &&
+      !message.toLowerCase().startsWith('@bot')
+    ) {
+      message = '@bot ' + message;
+    }
+
     socket.send(
       JSON.stringify({
         type: 'chat_message',
@@ -1178,6 +1262,33 @@ elements.form.addEventListener('submit', (e) => {
     elements.input.value = '';
   }
 });
+
+// Bot robot button functionality
+if (elements.botToggle && elements.input) {
+  // Track button state
+  let isActive = false;
+
+  // Update placeholder text and button appearance based on state
+  const updateBotState = () => {
+    if (isActive) {
+      elements.input.placeholder = 'Ask the bot anything...';
+      elements.botToggle.classList.add('active');
+    } else {
+      elements.input.placeholder = 'Type a message...';
+      elements.botToggle.classList.remove('active');
+    }
+  };
+
+  // Initial state
+  updateBotState();
+
+  // Listen for button clicks
+  elements.botToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    isActive = !isActive;
+    updateBotState();
+  });
+}
 
 // Three.js Interactive Background System
 const backgroundSystem = {
@@ -1672,6 +1783,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 });
+
+// Button click handler for hobby selection
+function sendButtonClick(buttonId, buttonText) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    const buttonClickMessage = `[BUTTON_CLICK|${buttonId}|${buttonText}]`;
+
+    socket.send(
+      JSON.stringify({
+        type: 'chat_message',
+        data: {
+          message: buttonClickMessage,
+        },
+      })
+    );
+  } else {
+    console.error('❌ WebSocket not connected, cannot send button click');
+  }
+}
 
 // Auto-initialize galleries when new messages are added
 const originalAddMessage = typeof addMessage !== 'undefined' ? addMessage : null;

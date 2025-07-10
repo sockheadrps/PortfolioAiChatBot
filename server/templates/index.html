@@ -105,6 +105,17 @@
         <div id="chat-container">
           <div id="messages"></div>
           <form id="chat-form">
+            <div class="bot-toggle-container">
+              <button
+                id="bot-toggle"
+                class="bot-robot-button"
+                type="button"
+                title="Toggle Bot Mode"
+              >
+                <span class="robot-icon">🤖</span>
+                <span class="robot-status">Ask Bot</span>
+              </button>
+            </div>
             <input
               type="text"
               id="message-input"
@@ -145,44 +156,71 @@
         </div>
         <div class="modal-body">
           <div class="welcome-section">
-            <h3>How to Use the ChatBot</h3>
+            <h3>🤖 Chat with the Bot</h3>
             <p>
-              Type <strong>@bot</strong> followed by your question to get responses about Ryan's
-              projects and experience.
+              Toggle the <strong>"Ask Bot"</strong> switch next to the message input, then just type
+              naturally!
             </p>
           </div>
 
           <div class="welcome-section">
-            <h3>Electrical Projects & Skills</h3>
+            <h3>🔧 Electrical & Manufacturing Projects</h3>
             <div class="example-questions">
-              <span class="example-tag">@bot Tell me about his power distribution experience</span>
-              <span class="example-tag">@bot What QAs experience does he have?</span>
+              <span class="example-tag">Tell me about his power distribution experience</span>
+              <span class="example-tag">What QA experience does he have?</span>
+              <span class="example-tag">Show me manufacturing projects</span>
             </div>
           </div>
 
           <div class="welcome-section">
-            <h3>Software Projects</h3>
+            <h3>💻 Programming Projects</h3>
             <div class="example-questions">
-              <span class="example-tag">@bot What programming languages does Ryan use?</span>
-              <span class="example-tag">@bot Show me his Python projects</span>
+              <span class="example-tag">What programming languages does Ryan use?</span>
+              <span class="example-tag">Show me his Python projects</span>
+              <span class="example-tag">Tell me about his GitHub projects</span>
             </div>
           </div>
 
           <div class="welcome-section">
-            <h3>Hobby Projects</h3>
+            <h3>🛠️ Hobby Projects</h3>
             <div class="example-questions">
-              <span class="example-tag">@bot What are Ryan's hobbies?</span>
+              <span class="example-tag">What are Ryan's hobbies?</span>
+              <span class="example-tag">Show me his electronics projects</span>
             </div>
           </div>
 
           <div class="welcome-section">
-            <h3>Tips</h3>
+            <h3>🔒 Privacy & Security</h3>
             <ul>
-              <li>The bot understands context and can provide detailed technical information</li>
+              <li>
+                <strong>Public Chat:</strong> When the "Ask Bot" toggle is OFF, you're in public
+                chat mode. All messages are unencrypted and visible to anyone logged in.
+              </li>
+              <li>
+                <strong>Private Messages:</strong> Click on any username in the online users list to
+                start a private message (PM).
+              </li>
+              <li>
+                <strong>End-to-End Encryption:</strong> PMs use RSA encryption for secure
+                communication between users.
+              </li>
+              <li>
+                <strong>Bot Interactions:</strong> When the toggle is ON, your messages to the bot
+                are part of the public chat but focused on getting information.
+              </li>
+            </ul>
+          </div>
+
+          <div class="welcome-section">
+            <h3>💡 Tips</h3>
+            <ul>
+              <li>The bot understands context and provides detailed technical information</li>
               <li>Ask about specific technologies, skills, or project types</li>
               <li>Get contextual answers about any aspect of Ryan's work</li>
               <li>
-                LLMs are not perfect, and any info you get is not guaranteed to be 100% accurate.
+                <em
+                  >Note: AI responses may not be 100% accurate. Always verify important details.</em
+                >
               </li>
             </ul>
           </div>
