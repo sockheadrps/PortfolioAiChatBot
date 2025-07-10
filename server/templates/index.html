@@ -103,6 +103,11 @@
 
       <div class="main-container">
         <div id="chat-container">
+          <div class="chat-header">
+            <button id="help-button" class="help-btn" title="What can I ask?">
+              <span>?</span>
+            </button>
+          </div>
           <div id="messages"></div>
           <form id="chat-form">
             <div class="bot-toggle-container">
@@ -146,6 +151,73 @@
       </div>
     </div>
     <div id="pm-footer"></div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>💡 What can I ask the bot?</h2>
+          <button id="help-close" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="welcome-section">
+            <h3>🔧 Electrical & Manufacturing</h3>
+            <div class="example-questions">
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Does he have electrical QA experience?</span
+              >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Tell me about his manufacturing experience</span
+              >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >What power distribution work has he done?</span
+              >
+            </div>
+          </div>
+
+          <div class="welcome-section">
+            <h3>💻 Programming & Software</h3>
+            <div class="example-questions">
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >What are his software projects?</span
+              >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >What programming languages does he use?</span
+              >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Show me his Python projects</span
+              >
+            </div>
+          </div>
+
+          <div class="welcome-section">
+            <h3>🛠️ Hardware & Hobbies</h3>
+            <div class="example-questions">
+              <span class="example-tag" onclick="insertQuestion(this)">What are his hobbies?</span>
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Show me electronics projects</span
+              >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Tell me about his hardware projects</span
+              >
+            </div>
+          </div>
+
+          <div class="welcome-section">
+            <h3>💡 Tips</h3>
+            <ul>
+              <li>Click any suggestion above to auto-fill the message box</li>
+              <li>Ask about specific skills, technologies, or project types</li>
+              <li>Request to see images: "Show me manufacturing projects"</li>
+              <li>Be specific: "What Python libraries has he used?"</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="help-got-it" class="btn welcome-btn">Got it!</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Welcome Modal -->
     <div id="welcome-modal" class="modal-overlay hidden">

@@ -89,6 +89,10 @@ const elements = {
   welcomeModal: document.getElementById('welcome-modal'),
   welcomeCloseBtn: document.getElementById('welcome-close'),
   welcomeGotItBtn: document.getElementById('welcome-got-it'),
+  helpButton: document.getElementById('help-button'),
+  helpModal: document.getElementById('help-modal'),
+  helpCloseBtn: document.getElementById('help-close'),
+  helpGotItBtn: document.getElementById('help-got-it'),
 };
 
 // Utility functions
@@ -1163,6 +1167,51 @@ function setupWelcomeModalHandlers() {
   });
 }
 
+// Help Modal Functions
+function showHelpModal() {
+  elements.helpModal?.classList.remove('hidden');
+}
+
+function hideHelpModal() {
+  elements.helpModal?.classList.add('hidden');
+}
+
+function setupHelpModalHandlers() {
+  // Help button handler
+  elements.helpButton?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showHelpModal();
+  });
+
+  // Close button handler
+  elements.helpCloseBtn?.addEventListener('click', hideHelpModal);
+
+  // Got it button handler
+  elements.helpGotItBtn?.addEventListener('click', hideHelpModal);
+
+  // Click outside modal to close
+  elements.helpModal?.addEventListener('click', (e) => {
+    if (e.target === elements.helpModal) {
+      hideHelpModal();
+    }
+  });
+}
+
+// Function to insert question into message input (global for onclick handlers)
+window.insertQuestion = function (element) {
+  const question = element.textContent;
+  if (elements.input) {
+    elements.input.value = question;
+    elements.input.focus();
+
+    // Make sure Ask Bot is enabled when inserting a question
+    if (elements.botToggle && !elements.botToggle.classList.contains('active')) {
+      elements.botToggle.click(); // This will trigger the toggle
+    }
+  }
+  hideHelpModal();
+};
+
 // Initialize app
 window.addEventListener('DOMContentLoaded', () => {
   // Authentication
@@ -1205,6 +1254,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Setup welcome modal handlers
   setupWelcomeModalHandlers();
+
+  // Setup help modal handlers
+  setupHelpModalHandlers();
 
   // Initialize panel as hidden
   elements.usersPanel.classList.add('hidden');
@@ -1265,8 +1317,8 @@ elements.form.addEventListener('submit', (e) => {
 
 // Bot robot button functionality
 if (elements.botToggle && elements.input) {
-  // Track button state
-  let isActive = false;
+  // Track button state - start enabled by default
+  let isActive = true;
 
   // Update placeholder text and button appearance based on state
   const updateBotState = () => {

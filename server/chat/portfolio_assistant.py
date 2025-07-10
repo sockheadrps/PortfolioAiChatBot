@@ -843,23 +843,6 @@ class PortfolioAssistant:
         return matches
 
     
-    def ask_ollama(self, query: str, matches: List[str], user_id: str = "default", filter_type: str = None) -> str:
-        """Generate response using Ollama with relevant project context (non-streaming fallback)."""
-        try:
-            if not matches:
-                return self._get_fallback_response(query)
-            
-            # For backward compatibility, use the streaming version and join the results
-            response_parts = []
-            for chunk in self.ask_ollama_stream(query, matches, user_id, filter_type):
-                response_parts.append(chunk)
-            
-            return "".join(response_parts) if response_parts else self._get_fallback_response(query)
-                
-        except Exception as e:
-            print(f"❌ Error with Ollama: {e}")
-            return self._get_simple_response(matches, query)
-
     def ask_ollama_stream(self, query: str, matches: List[str], user_id: str = "default", filter_type: str = None) -> Iterator[str]:
         """Generate streaming response using Ollama HTTP API with relevant project context."""
         print(f"[📤] Sending prompt to Ollama model: {OLLAMA_CONFIG['MODEL']}")
@@ -1053,66 +1036,6 @@ class PortfolioAssistant:
         import random
         return random.choice(fallbacks)
     
-    def get_response(self, query: str, user_id: str = "default") -> str:
-        # Check for button clicks first
-        button_result = self.handle_button_click(query, user_id)
-        if button_result:
-            return button_result
-            
-        user_state = self.get_user_state(user_id)
-        
-        if user_state.get("awaiting_hobby_choice"):
-            # Check if the query looks like a hobby selection (number or hobby name match)
-            cleaned_query = query.strip().lower()
-            hobby_projects = user_state.get("last_hobby_list", [])
-            
-            # Is this a number selection (1, 2, 3)?
-            is_number_selection = cleaned_query.isdigit() and 1 <= int(cleaned_query) <= len(hobby_projects)
-            
-            # Is this a hobby name match?
-            is_name_match = any(cleaned_query in proj["name"].lower() for proj in hobby_projects)
-            
-            if is_number_selection or is_name_match:
-                # This looks like a hobby selection, handle it
-                result = self.handle_hobby_selection(query, user_id)
-                return result or "Please click a 'View Photos' button to see project details."
-            else:
-                # This is a different question, clear the hobby state and continue processing
-                print(f"[DEBUG] Clearing hobby state for unrelated query: {query}")
-                user_state["awaiting_hobby_choice"] = False
-                user_state["last_hobby_list"] = []
-                # Continue processing the new query below
-
-        # Expanded hobby detection to match streaming version
-        hobby_keywords = [
-            "hobbies", "hobby projects", "hobby project", "personal projects", 
-            "hardware projects", "electronics projects", "diy projects",
-            "side projects", "hobby showcases", "hobby work", "what hobbies",
-            "tell me about his hobbies", "hardware work", "electronics work"
-        ]
-        if any(keyword in query.lower() for keyword in hobby_keywords):
-            return self.handle_hobby_list(user_id)
-
-        if not self.projects:
-            return self._get_fallback_response(query)
-
-        try:
-            filter_type = self.infer_filter_type(query)
-            
-            # Detect broad queries that should return more results
-            is_broad_query = any(phrase in query.lower() for phrase in [
-                "programming projects", "software projects", "projects", "portfolio", 
-                "all projects", "what projects", "work on", "built", "developed"
-            ])
-            
-            # Use more results for broad queries
-            top_k = 6 if is_broad_query else 3
-            matches = self.query_portfolio(query, top_k=top_k, filter_type=filter_type)
-            return self.ask_ollama(query, matches, user_id, filter_type)
-        except Exception as e:
-            print(f"❌ Error getting response: {e}")
-            return self._get_fallback_response(query)
-
     def get_response_stream(self, query: str, user_id: str = "default") -> Iterator[str]:
         """Main optimized method to get a streaming response to a query, with hobby handling."""
         
@@ -1169,7 +1092,7 @@ class PortfolioAssistant:
         
         # Intercept software/project list questions and respond with predefined text
         if any(kw in query.lower() for kw in [
-            "programming projects", "software projects", "code projects", 
+            "programming projects", "software projects", "code projects", "python projects",
             "what projects has he built", "list his projects", "developer projects"
         ]):
             yield from self._predefined_software_projects()
