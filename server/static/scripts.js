@@ -343,7 +343,7 @@ const messageHandler = {
     // Determine if this is a sent or received message
     const messageClass = user === currentUsername ? 'sent' : 'received';
     // Linkify URLs in private messages
-    const linkedMessage = this.linkifyUrls(message);
+    const linkedMessage = messageHandler.linkifyUrls(message);
     const msgDiv = utils.createElement('div', `message ${messageClass}`);
     msgDiv.innerHTML = `
       <span class="user-name">${user}</span>
@@ -355,7 +355,7 @@ const messageHandler = {
 
   addSystemMessage: (container, message) => {
     // Linkify URLs in system messages
-    const linkedMessage = this.linkifyUrls(message);
+    const linkedMessage = messageHandler.linkifyUrls(message);
     const msgDiv = utils.createElement('div', 'message system');
     msgDiv.innerHTML = linkedMessage;
     container.appendChild(msgDiv);
