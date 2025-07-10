@@ -9,6 +9,9 @@ from typing import List, Dict, Any, Optional, Iterator, Callable
 import requests
 import chromadb
 from chromadb.config import Settings
+from datetime import datetime
+from server.db.db import SessionLocal
+from server.db.dbmodels import ChatHistory
 
 # ========== CONFIGURATION ==========
 # WebSocket Endpoints - Configure your chat connections here
@@ -856,6 +859,7 @@ class PortfolioAssistant:
         return matches
 
     
+    
     def ask_ollama_stream(self, query: str, matches: List[str], user_id: str = "default", filter_type: str = None) -> Iterator[str]:
         """Generate streaming response using Ollama HTTP API with relevant project context."""
         print(f"[📤] Sending prompt to Ollama model: {OLLAMA_CONFIG['MODEL']}")
@@ -997,6 +1001,9 @@ class PortfolioAssistant:
                     # Add image button if response completed successfully and we have images
                     if response_complete and projects_with_images:
                         yield "\n\n[BUTTON|view_project_images|View Images]"
+
+                    # save query and response to db
+                    self.save_query_and_response(query, buffer, user_id)
                     
                         
                 else:
@@ -1229,6 +1236,59 @@ class PortfolioAssistant:
 
         return None  # fallback to no filter
 
+    
+    def save_query_and_response(self, query: str, response: str, username: str = "unknown"):
+        """Save query and response to database with user information."""
+        try:
+            db = SessionLocal()
+            chat_entry = ChatHistory(
+                username=username,
+                message=query,
+                response=response,
+                timestamp=datetime.utcnow()
+            )
+            db.add(chat_entry)
+            db.commit()
+            print(f"💾 Saved chat history for user {username}")
+        except Exception as e:
+            print(f"❌ Error saving chat history: {e}")
+        finally:
+            db.close()
+    
+    def save_response(self, query: str, username: str, response: str):
+        """Alias for save_query_and_response for compatibility."""
+        self.save_query_and_response(query, response, username)
+    
+    def get_chat_history(self, username: str = None, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve chat history from database, optionally filtered by username."""
+        try:
+            db = SessionLocal()
+            query = db.query(ChatHistory)
+            
+            if username:
+                query = query.filter(ChatHistory.username == username)
+            
+            # Order by timestamp descending (most recent first) and limit results
+            chat_history = query.order_by(ChatHistory.timestamp.desc()).limit(limit).all()
+            
+            # Convert to list of dictionaries
+            history_list = []
+            for entry in chat_history:
+                history_list.append({
+                    "id": entry.id,
+                    "username": entry.username,
+                    "message": entry.message,
+                    "response": entry.response,
+                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+                })
+            
+            return history_list
+            
+        except Exception as e:
+            print(f"❌ Error retrieving chat history: {e}")
+            return []
+        finally:
+            db.close()
     
     @classmethod
     def cleanup_cache(cls):

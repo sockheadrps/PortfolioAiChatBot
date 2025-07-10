@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends
 from jose import jwt, JWTError
 from typing import List
 import json
@@ -9,6 +9,10 @@ from server.auth.auth import SECRET_KEY, ALGORITHM
 from server.utils.models import WsEvent, ChatMessageData, JoinData, LeaveData, ServerBroadcastData
 from server.chat.private_manager import PrivateConnectionManager
 from server.chat.bot_user import initialize_bot, get_bot
+from server.db.db import SessionLocal
+from server.db.dbmodels import ChatHistory
+import asyncio
+
 
 
 router = APIRouter()
@@ -58,7 +62,6 @@ async def _handle_bot_button_click(bot, username: str, message: str, manager: Co
 
 async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager):
     """Handle bot responses to public chat messages with streaming support"""
-    import asyncio
     
     message_lower = message.lower()
     
@@ -164,6 +167,8 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         "full_message": response_buffer
                     }
                 }))
+                # save the response to db
+                bot.portfolio_assistant.save_response(cleaned_message, username, response_buffer)
                 
             except Exception as stream_error:
                 print(f"❌ Error in streaming response: {stream_error}")
@@ -197,6 +202,66 @@ async def send_event(request: WsEvent):
         return {"status": "Event sent successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send event: {str(e)}")
+
+
+@router.get("/chat-history")
+async def get_chat_history(username: str = None, limit: int = 50):
+    """Get chat history from database, optionally filtered by username."""
+    try:
+        db = SessionLocal()
+        query = db.query(ChatHistory)
+        
+        if username:
+            query = query.filter(ChatHistory.username == username)
+        
+        # Order by timestamp descending (most recent first) and limit results
+        chat_history = query.order_by(ChatHistory.timestamp.desc()).limit(limit).all()
+        
+        # Convert to list of dictionaries
+        history_list = []
+        for entry in chat_history:
+            history_list.append({
+                "id": entry.id,
+                "username": entry.username,
+                "message": entry.message,
+                "response": entry.response,
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+            })
+        
+        return {"chat_history": history_list, "count": len(history_list)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.get("/chat-history/{username}")
+async def get_user_chat_history(username: str, limit: int = 50):
+    """Get chat history for a specific user."""
+    try:
+        db = SessionLocal()
+        chat_history = db.query(ChatHistory).filter(
+            ChatHistory.username == username
+        ).order_by(ChatHistory.timestamp.desc()).limit(limit).all()
+        
+        # Convert to list of dictionaries
+        history_list = []
+        for entry in chat_history:
+            history_list.append({
+                "id": entry.id,
+                "username": entry.username,
+                "message": entry.message,
+                "response": entry.response,
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+            })
+        
+        return {"chat_history": history_list, "count": len(history_list), "username": username}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
+    finally:
+        db.close()
 
 
 @router.websocket("/ws")
