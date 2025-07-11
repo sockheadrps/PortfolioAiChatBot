@@ -2,7 +2,7 @@
 const WS_CONFIG = {
   LOCAL_WS_URL: 'ws://localhost:8080/ws',
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
-  ACTIVE_WS_URL: 'ws://localhost:8080/ws',
+  ACTIVE_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
 };
 
 // State management
