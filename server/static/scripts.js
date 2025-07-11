@@ -378,16 +378,61 @@ const socketHandlers = {
           currentAudio.currentTime = 0;
         }
 
-        // Create audio with iOS-compatible approach
-        const audio = new Audio();
+        // Detect iOS Safari
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const isIOSSafari = isIOS && isSafari;
+        // Uncomment the line below to force Blob URL approach for testing
+        // const isIOSSafari = true;
 
-        // Set audio properties before loading
+        // Debug logging
+        console.log('🔍 Device Detection:', {
+          userAgent: navigator.userAgent,
+          isIOS: isIOS,
+          isSafari: isSafari,
+          isIOSSafari: isIOSSafari,
+        });
+
+        let audio;
+
+        if (isIOSSafari) {
+          // iOS Safari: Use Blob URL approach
+          try {
+            const binary = atob(data.voice_b64);
+            const array = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+              array[i] = binary.charCodeAt(i);
+            }
+            const blob = new Blob([array], { type: 'audio/wav' });
+            const blobUrl = URL.createObjectURL(blob);
+
+            audio = new Audio(blobUrl);
+
+            // Clean up blob URL when audio ends or errors
+            audio.addEventListener('ended', () => {
+              URL.revokeObjectURL(blobUrl);
+              currentAudio = null;
+            });
+
+            audio.addEventListener('error', () => {
+              URL.revokeObjectURL(blobUrl);
+              currentAudio = null;
+            });
+
+            console.log('🔧 Using Blob URL for iOS Safari');
+          } catch (blobErr) {
+            console.error('🔧 Blob creation failed, falling back to Data URI:', blobErr);
+            audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+          }
+        } else {
+          // Non-iOS: Use Data URI approach
+          audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+        }
+
+        // Set audio properties
         audio.volume = audioVolume;
         audio.playbackRate = audioPlaybackRate;
         audio.preload = 'auto';
-
-        // iOS Safari workaround: Set audio source after properties
-        audio.src = 'data:audio/wav;base64,' + data.voice_b64;
         currentAudio = audio;
 
         // iOS-compatible play with multiple fallbacks
