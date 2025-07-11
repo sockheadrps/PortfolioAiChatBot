@@ -137,27 +137,50 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                     import re
                     cleaned_message = re.sub(r'@bot\b', '', message, flags=re.IGNORECASE).strip()
                 
+                total_chunks = 0
+                estimated_total_chunks = 50  # Rough estimate for progress calculation
+                
                 for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username):
                     if chunk:
-                        response_buffer += chunk
-                        
-                        # Send streaming chunk
-                        await manager.broadcast(json.dumps({
-                            "event": "bot_message_stream",
-                            "data": {
-                                "user": bot.username,
-                                "chunk": chunk,
-                                "is_first": is_first_chunk,
-                                "is_complete": False
-                            }
-                        }))
+                        # Check if this is a status marker
+                        if chunk.startswith("[STATUS|"):
+                            # Parse status data
+                            status_parts = chunk.strip("[]").split("|")
+                            if len(status_parts) >= 2:
+                                status_message = status_parts[1]
+                                
+                                # Send status update
+                                await manager.broadcast(json.dumps({
+                                    "event": "bot_message_stream",
+                                    "data": {
+                                        "user": bot.username,
+                                        "chunk": "",
+                                        "is_first": is_first_chunk,
+                                        "is_complete": False,
+                                        "status": status_message
+                                    }
+                                }))
+                        else:
+                            # Regular text chunk
+                            response_buffer += chunk
+                            
+                            # Send streaming chunk
+                            await manager.broadcast(json.dumps({
+                                "event": "bot_message_stream",
+                                "data": {
+                                    "user": bot.username,
+                                    "chunk": chunk,
+                                    "is_first": is_first_chunk,
+                                    "is_complete": False
+                                }
+                            }))
                         
                         is_first_chunk = False
                         
                         # Small delay between chunks for better UX
                         await asyncio.sleep(0.1)
                 
-                # Send completion signal
+                # Send completion signal with 100% progress
                 await manager.broadcast(json.dumps({
                     "event": "bot_message_stream",
                     "data": {
@@ -165,7 +188,8 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         "chunk": "",
                         "is_first": False,
                         "is_complete": True,
-                        "full_message": response_buffer
+                        "full_message": response_buffer,
+                        "progress": 100
                     }
                 }))
                 # synthesize the response to base64
@@ -192,15 +216,29 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
             except Exception as stream_error:
                 print(f"❌ Error in streaming response: {stream_error}")
                 # Fallback to complete message if streaming fails
-                fallback_response = bot.portfolio_assistant.get_response(cleaned_message, username)
-                
-                await manager.broadcast(json.dumps({
-                    "event": "chat_message",
-                    "data": {
-                        "user": bot.username,
-                        "message": fallback_response
-                    }
-                }))
+                try:
+                    # Use the streaming method but collect all chunks
+                    fallback_response = ""
+                    for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username):
+                        if chunk and not chunk.startswith("[PROGRESS|"):
+                            fallback_response += chunk
+                    
+                    await manager.broadcast(json.dumps({
+                        "event": "chat_message",
+                        "data": {
+                            "user": bot.username,
+                            "message": fallback_response
+                        }
+                    }))
+                except Exception as fallback_error:
+                    print(f"❌ Fallback also failed: {fallback_error}")
+                    await manager.broadcast(json.dumps({
+                        "event": "chat_message",
+                        "data": {
+                            "user": bot.username,
+                            "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+                        }
+                    }))
             
         except Exception as e:
             print(f"❌ Error generating bot response: {e}")

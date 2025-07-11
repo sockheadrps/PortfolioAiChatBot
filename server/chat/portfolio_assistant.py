@@ -963,6 +963,9 @@ class PortfolioAssistant:
                 "stream": OLLAMA_CONFIG["STREAM"]
             }
             
+            # Send initial status
+            yield f"[STATUS|Passing data to LLM...]"
+            
             try:
                 response = requests.post(
                     OLLAMA_CONFIG["API_URL"],
@@ -974,14 +977,24 @@ class PortfolioAssistant:
                 if response.status_code == 200:
                     buffer = ""
                     response_complete = False
+                    chunks_received = 0
+                    
+                    # Send "connected" status when we start receiving data
+                    yield f"[STATUS|Generating response...]"
                     
                     for line in response.iter_lines():
                         if line:
                             try:
                                 data = json.loads(line.decode('utf-8'))
+                                
                                 if 'response' in data:
                                     chunk = data['response']
                                     buffer += chunk
+                                    chunks_received += 1
+                                    
+                                    # Send status update every 10 chunks
+                                    if chunks_received % 10 == 0:
+                                        yield f"[STATUS|Generated {chunks_received} chunks...]"
                                     
                                     # Yield complete words/sentences for smoother display
                                     if chunk in [' ', '.', '!', '?', '\n'] or len(buffer) >= 10:

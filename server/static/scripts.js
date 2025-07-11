@@ -17,6 +17,8 @@ let isAudioEnabled = true; // Audio toggle state
 let audioVolume = 0.5; // Volume level (0.0 to 1.0)
 let audioPlaybackRate = 1.3; // Playback speed (0.5x to 2.0x)
 let currentAudio = null; // Currently playing audio element
+let userHasInteracted = false; // Track if user has interacted (required for iOS audio)
+let pendingAudio = null; // Audio waiting to be played after user interaction
 
 // Background settings
 let backgroundSettings = {
@@ -301,8 +303,35 @@ const messageHandler = {
 
       const cursor = streamingMessage.querySelector('.cursor-blink');
       if (cursor) cursor.remove();
+
+      // Remove status indicator
+      const statusIndicator = streamingMessage.querySelector('.streaming-status');
+      if (statusIndicator) statusIndicator.remove();
+
       streamingMessage.classList.remove('streaming');
       streamingMessage.removeAttribute('id');
+    }
+  },
+
+  updateStreamingStatus: (container, statusMessage) => {
+    const streamingMessage = container.querySelector('#streaming-message');
+    if (!streamingMessage) {
+      return;
+    }
+
+    let statusIndicator = streamingMessage.querySelector('.streaming-status');
+    if (!statusIndicator) {
+      statusIndicator = document.createElement('div');
+      statusIndicator.className = 'streaming-status';
+      statusIndicator.innerHTML = `
+        <div class="status-text"></div>
+      `;
+      streamingMessage.appendChild(statusIndicator);
+    }
+
+    const statusText = statusIndicator.querySelector('.status-text');
+    if (statusText) {
+      statusText.textContent = statusMessage;
     }
   },
 };
@@ -333,6 +362,11 @@ const socketHandlers = {
 
     if (!data.is_complete) {
       messageHandler.handleStreamingChunk(elements.messages, data.user, data.chunk, data.is_first);
+
+      // Update status indicator if available
+      if (data.status !== undefined) {
+        messageHandler.updateStreamingStatus(elements.messages, data.status);
+      }
     } else {
       messageHandler.completeStreamingMessage(elements.messages, data.user);
 
@@ -344,20 +378,72 @@ const socketHandlers = {
           currentAudio.currentTime = 0;
         }
 
-        const audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+        // Create audio with iOS-compatible approach
+        const audio = new Audio();
+
+        // Set audio properties before loading
         audio.volume = audioVolume;
         audio.playbackRate = audioPlaybackRate;
+        audio.preload = 'auto';
+
+        // iOS Safari workaround: Set audio source after properties
+        audio.src = 'data:audio/wav;base64,' + data.voice_b64;
         currentAudio = audio;
 
-        audio.play().catch((err) => {
-          console.error('🔇 Error playing voice audio:', err);
-          currentAudio = null;
+        // iOS-compatible play with multiple fallbacks
+        const playAudio = async () => {
+          try {
+            // Check if user has interacted (required for iOS)
+            if (!userHasInteracted) {
+              console.log('🔇 Waiting for user interaction before playing audio...');
+              pendingAudio = audio; // Queue audio for later
+              return; // Don't try to play until user interacts
+            }
+
+            // Try to play immediately
+            await audio.play();
+          } catch (err) {
+            console.error('🔇 Initial play failed, trying iOS workaround:', err);
+
+            // iOS Safari workaround: Load and play on user interaction
+            audio.load();
+
+            // Try again after a short delay
+            setTimeout(async () => {
+              try {
+                await audio.play();
+              } catch (retryErr) {
+                console.error('🔇 Audio play failed after retry:', retryErr);
+                currentAudio = null;
+
+                // Show user-friendly message for iOS users
+                if (retryErr.name === 'NotAllowedError') {
+                  messageHandler.addSystemMessage(
+                    elements.messages,
+                    '🔇 Audio blocked by browser. Try tapping the audio button or interacting with the page first.'
+                  );
+                }
+              }
+            }, 100);
+          }
+        };
+
+        // Add event listeners
+        audio.addEventListener('canplaythrough', () => {
+          // Audio is ready to play
         });
 
-        // Clear current audio reference when it finishes
         audio.addEventListener('ended', () => {
           currentAudio = null;
         });
+
+        audio.addEventListener('error', (err) => {
+          console.error('🔇 Audio error:', err);
+          currentAudio = null;
+        });
+
+        // Start playing
+        playAudio();
       }
     }
   },
@@ -1364,6 +1450,32 @@ window.addEventListener('DOMContentLoaded', () => {
   const userDisplay = document.getElementById('current-user');
   if (userDisplay) userDisplay.textContent = currentUsername;
 
+  // Track user interactions for iOS audio compatibility
+  const markUserInteraction = () => {
+    if (!userHasInteracted) {
+      userHasInteracted = true;
+      console.log('✅ User interaction detected - audio can now play');
+
+      // Try to play any pending audio
+      if (pendingAudio) {
+        pendingAudio.play().catch((err) => {
+          console.log("🔇 Still can't play pending audio:", err);
+        });
+        pendingAudio = null;
+      } else if (currentAudio && currentAudio.paused) {
+        currentAudio.play().catch((err) => {
+          console.log("🔇 Still can't play audio:", err);
+        });
+      }
+    }
+  };
+
+  // Listen for various user interactions
+  document.addEventListener('click', markUserInteraction, { once: true });
+  document.addEventListener('touchstart', markUserInteraction, { once: true });
+  document.addEventListener('keydown', markUserInteraction, { once: true });
+  document.addEventListener('scroll', markUserInteraction, { once: true });
+
   // Event listeners
   elements.logoutBtn?.addEventListener('click', () => {
     document.cookie = 'access_token=; Max-Age=0';
@@ -1469,6 +1581,9 @@ if (elements.audioToggle) {
     e.preventDefault();
     isAudioEnabled = !isAudioEnabled;
 
+    // Mark user interaction for iOS audio
+    userHasInteracted = true;
+
     // If audio is being disabled, stop any currently playing audio
     if (!isAudioEnabled && currentAudio) {
       currentAudio.pause();
@@ -1498,6 +1613,19 @@ if (elements.volumeSlider) {
 
   // Prevent volume slider from triggering audio toggle
   elements.volumeSlider.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  // Touch event handlers for better mobile control
+  elements.volumeSlider.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+  });
+
+  elements.volumeSlider.addEventListener('touchmove', (e) => {
+    e.stopPropagation();
+  });
+
+  elements.volumeSlider.addEventListener('touchend', (e) => {
     e.stopPropagation();
   });
 } else {
@@ -1538,6 +1666,61 @@ if (elements.speedToggle) {
   // Prevent default click behavior
   elements.speedToggle.addEventListener('click', (e) => {
     e.preventDefault();
+  });
+
+  // Touch event handlers for speed control
+  let touchStartY = 0;
+  let touchStartTime = 0;
+
+  elements.speedToggle.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+
+    // Add visual feedback for touch
+    elements.speedToggle.classList.add('touch-active');
+  });
+
+  elements.speedToggle.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchStartY - touchY;
+
+    // Only adjust speed if there's significant movement
+    if (Math.abs(deltaY) > 10) {
+      const delta = deltaY > 0 ? 0.1 : -0.1;
+      const newSpeed = Math.max(0.5, Math.min(2.0, audioPlaybackRate + delta));
+
+      if (newSpeed !== audioPlaybackRate) {
+        audioPlaybackRate = newSpeed;
+
+        // Update speed display
+        if (elements.speedDisplay) {
+          elements.speedDisplay.textContent = audioPlaybackRate.toFixed(1) + 'x';
+        }
+
+        // Apply speed change to currently playing audio
+        if (currentAudio) {
+          currentAudio.playbackRate = audioPlaybackRate;
+        }
+      }
+
+      touchStartY = touchY;
+    }
+  });
+
+  elements.speedToggle.addEventListener('touchend', (e) => {
+    e.preventDefault();
+
+    // Remove visual feedback when touch ends
+    elements.speedToggle.classList.remove('touch-active');
+  });
+
+  elements.speedToggle.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+
+    // Remove visual feedback if touch is cancelled
+    elements.speedToggle.classList.remove('touch-active');
   });
 } else {
   console.error('⚡ Speed control element not found!');
@@ -1700,13 +1883,11 @@ function updateBackgroundSettings() {
 
 // Initialize Three.js background
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    if (typeof THREE === 'undefined') {
-      console.error('Three.js not loaded! Background effects will not work.');
-      return;
-    }
-    backgroundSystem.init();
-  }, 500);
+  if (typeof THREE === 'undefined') {
+    console.error('Three.js not loaded! Background effects will not work.');
+    return;
+  }
+  backgroundSystem.init();
 });
 
 // Tooltip system
