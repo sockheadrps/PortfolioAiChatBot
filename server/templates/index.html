@@ -22,7 +22,12 @@
         <span class="logged-in-text">Logged in as:</span>
         <span id="current-user" class="username-display"></span>
       </div>
-      <button id="logout-btn">Logout</button>
+      <div class="header-controls">
+        <button id="settings-btn" class="settings-btn" title="Background Settings">
+          <span>⚙️</span>
+        </button>
+        <button id="logout-btn">Logout</button>
+      </div>
     </div>
 
     <div id="private-chat-container">
@@ -79,7 +84,52 @@
         <button id="private-send-btn">Send</button>
       </div>
     </div>
+
+    <!-- Settings Popup -->
+    <div id="settings-popup" class="settings-popup hidden">
+      <div class="settings-content">
+        <h3>🎨 Background Settings</h3>
+        <div class="setting-group">
+          <label for="brightness-slider">Brightness</label>
+          <input type="range" id="brightness-slider" min="0" max="200" value="100" />
+          <span class="setting-value" id="brightness-value">100%</span>
+        </div>
+        <div class="setting-group">
+          <label for="decay-slider">Decay Speed</label>
+          <input type="range" id="decay-slider" min="50" max="300" value="150" />
+          <span class="setting-value" id="decay-value">150%</span>
+        </div>
+        <div class="setting-group">
+          <label for="drift-slider">Drift Intensity</label>
+          <input type="range" id="drift-slider" min="0" max="200" value="100" />
+          <span class="setting-value" id="drift-value">100%</span>
+        </div>
+        <div class="setting-group">
+          <label for="glow-slider">Glow Intensity</label>
+          <input type="range" id="glow-slider" min="0" max="200" value="100" />
+          <span class="setting-value" id="glow-value">100%</span>
+        </div>
+        <div class="setting-group">
+          <label for="trail-slider">Trail Duration</label>
+          <input type="range" id="trail-slider" min="500" max="3000" value="1500" step="100" />
+          <span class="setting-value" id="trail-value">1.5s</span>
+        </div>
+        <div class="setting-group">
+          <label for="radius-slider">Cursor Radius</label>
+          <input type="range" id="radius-slider" min="50" max="200" value="100" />
+          <span class="setting-value" id="radius-value">100px</span>
+        </div>
+        <div class="setting-group">
+          <label for="dot-size-slider">Dot Size</label>
+          <input type="range" id="dot-size-slider" min="50" max="200" value="100" />
+          <span class="setting-value" id="dot-size-value">100%</span>
+        </div>
+        <button id="reset-settings" class="reset-btn">Reset to Default</button>
+      </div>
+    </div>
+
     <div id="invite-toast-container"></div>
+    <div id="tooltip-container"></div>
 
     <div class="layout-container">
       <div class="users-toggle" id="users-toggle" title="Hide Users Panel">◀</div>
@@ -92,7 +142,31 @@
       <div class="main-container">
         <div id="chat-container">
           <div class="chat-header">
-            <button id="help-button" class="help-btn" title="What can I ask?">
+            <div class="audio-controls">
+              <button id="audio-toggle" class="audio-btn" data-tooltip="Toggle Audio On/Off">
+                <span>🔊</span>
+              </button>
+              <div class="volume-slider-container">
+                <input
+                  type="range"
+                  id="volume-slider"
+                  class="volume-slider"
+                  min="0"
+                  max="100"
+                  value="50"
+                  title="Volume"
+                />
+              </div>
+              <button
+                id="speed-toggle"
+                class="speed-btn"
+                data-tooltip="Scroll to adjust playback speed"
+              >
+                <span>⚡</span>
+                <span class="speed-display">1.0x</span>
+              </button>
+            </div>
+            <button id="help-button" class="help-btn" data-tooltip="What can I ask?">
               <span>?</span>
             </button>
           </div>
@@ -160,6 +234,9 @@
               <span class="example-tag" onclick="insertQuestion(this)"
                 >What power distribution work has he done?</span
               >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Show me manufacturing projects</span
+              >
             </div>
           </div>
 
@@ -175,13 +252,18 @@
               <span class="example-tag" onclick="insertQuestion(this)"
                 >Show me his Python projects</span
               >
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >Tell me about his GitHub projects</span
+              >
             </div>
           </div>
 
           <div class="welcome-section">
             <h3>🛠️ Hardware & Hobbies</h3>
             <div class="example-questions">
-              <span class="example-tag" onclick="insertQuestion(this)">What are his hobbies?</span>
+              <span class="example-tag" onclick="insertQuestion(this)"
+                >What are Ryan's hobbies?</span
+              >
               <span class="example-tag" onclick="insertQuestion(this)"
                 >Show me electronics projects</span
               >
@@ -189,16 +271,6 @@
                 >Tell me about his hardware projects</span
               >
             </div>
-          </div>
-
-          <div class="welcome-section">
-            <h3>💡 Tips</h3>
-            <ul>
-              <li>Click any suggestion above to auto-fill the message box</li>
-              <li>Ask about specific skills, technologies, or project types</li>
-              <li>Request to see images: "Show me manufacturing projects"</li>
-              <li>Be specific: "What Python libraries has he used?"</li>
-            </ul>
           </div>
         </div>
         <div class="modal-footer">
@@ -211,81 +283,176 @@
     <div id="welcome-modal" class="modal-overlay hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>🤖 Welcome to Ryan's Portfolio Chat</h2>
+          <h2 id="welcome-modal-title">🤖 Welcome to Ryan's Portfolio Chat</h2>
           <button id="welcome-close" class="modal-close-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="welcome-section">
-            <h3>🤖 Chat with the Bot</h3>
-            <p>
-              Toggle the <strong>"Ask Bot"</strong> switch next to the message input, then just type
-              naturally!
-            </p>
-          </div>
+          <!-- Page 1: Technical Information -->
+          <div id="welcome-page-1" class="welcome-page">
+            <div class="welcome-section">
+              <h3>🧠 The AI Assistant</h3>
+              <p>
+                Local, RAG-powered, domain-specific assistant for portfolio/project Q&A and
+                exploration, using python and SentenceTransformers to embed project data and queries
+                for semantic retrieval.
+              </p>
+              <p>
+                The audio is generated using training data of my own voice and Piper TTS, a fast,
+                local neural text-to-speech engine that uses embedded espeak-ng for phonemization.
+              </p>
 
-          <div class="welcome-section">
-            <h3>🔧 Electrical & Manufacturing Projects</h3>
-            <div class="example-questions">
-              <span class="example-tag">Tell me about his power distribution experience</span>
-              <span class="example-tag">What QA experience does he have?</span>
-              <span class="example-tag">Show me manufacturing projects</span>
+              <h3>🤖 Chat with the Bot</h3>
+              <p>
+                Toggle the <strong>"Ask Bot"</strong> switch next to the message input, then just
+                type naturally!
+              </p>
+            </div>
+
+            <div class="welcome-section">
+              <h3>🔊 Text-to-Speech Audio</h3>
+              <p>
+                The bot can read its responses aloud using text-to-speech. You have full control
+                over the audio settings:
+              </p>
+              <ul>
+                <li>
+                  <strong>🔊 / 🔇 Audio Toggle:</strong> Click the audio icon to enable or disable
+                  spoken responses. Disabling it will mute all audio and immediately stop any that’s
+                  currently playing.
+                </li>
+                <li>
+                  <strong>🎚️ Volume Slider:</strong> Hover over the audio icon to reveal a volume
+                  control. Slide from 0% (mute) to 100% (maximum volume).
+                </li>
+                <li>
+                  <strong>⚡ Speed Control:</strong> Scroll up/down on the speed button (⚡) to
+                  adjust playback speed from 0.5x (slow) to 2.0x (fast) in 0.1 increments. Changes
+                  apply in real-time.
+                </li>
+              </ul>
+            </div>
+
+            <div class="welcome-section">
+              <h3>❓ Help & Navigation</h3>
+              <ul>
+                <li>
+                  <strong>Help Button (?):</strong> Click the question mark button in the chat
+                  header for example questions and tips.
+                </li>
+                <li>
+                  <strong>Users Panel:</strong> Click the users toggle (👥) to see online users and
+                  start private chats.
+                </li>
+              </ul>
+            </div>
+
+            <div class="welcome-section">
+              <h3>🔒 Privacy & Security</h3>
+              <ul>
+                <li>
+                  <strong>Public Chat:</strong> When the "Ask Bot" toggle is OFF, you're in public
+                  chat mode. All messages are unencrypted and visible to anyone logged in.
+                </li>
+                <li>
+                  <strong>Private Messages:</strong> Click on any username in the online users list
+                  to start a private message (PM).
+                </li>
+                <li>
+                  <strong>End-to-End Encryption:</strong> PMs use RSA encryption for secure
+                  communication between users.
+                </li>
+                <li>
+                  <strong>Bot Interactions:</strong> When the toggle is ON, your messages to the bot
+                  are part of the public chat but focused on getting information.
+                </li>
+              </ul>
+            </div>
+
+            <div class="welcome-section">
+              <h3>💡 Tips</h3>
+              <ul>
+                <li>The bot understands context and provides detailed technical information</li>
+                <li>Ask about specific technologies, skills, or project types</li>
+                <li>Get contextual answers about any aspect of Ryan's work</li>
+                <li>
+                  <em
+                    >Note: AI responses may not be 100% accurate. Always verify important
+                    details.</em
+                  >
+                </li>
+              </ul>
             </div>
           </div>
 
-          <div class="welcome-section">
-            <h3>💻 Programming Projects</h3>
-            <div class="example-questions">
-              <span class="example-tag">What programming languages does Ryan use?</span>
-              <span class="example-tag">Show me his Python projects</span>
-              <span class="example-tag">Tell me about his GitHub projects</span>
-            </div>
-          </div>
-
-          <div class="welcome-section">
-            <h3>🛠️ Hobby Projects</h3>
-            <div class="example-questions">
-              <span class="example-tag">What are Ryan's hobbies?</span>
-              <span class="example-tag">Show me his electronics projects</span>
-            </div>
-          </div>
-
-          <div class="welcome-section">
-            <h3>🔒 Privacy & Security</h3>
-            <ul>
-              <li>
-                <strong>Public Chat:</strong> When the "Ask Bot" toggle is OFF, you're in public
-                chat mode. All messages are unencrypted and visible to anyone logged in.
-              </li>
-              <li>
-                <strong>Private Messages:</strong> Click on any username in the online users list to
-                start a private message (PM).
-              </li>
-              <li>
-                <strong>End-to-End Encryption:</strong> PMs use RSA encryption for secure
-                communication between users.
-              </li>
-              <li>
-                <strong>Bot Interactions:</strong> When the toggle is ON, your messages to the bot
-                are part of the public chat but focused on getting information.
-              </li>
-            </ul>
-          </div>
-
-          <div class="welcome-section">
-            <h3>💡 Tips</h3>
-            <ul>
-              <li>The bot understands context and provides detailed technical information</li>
-              <li>Ask about specific technologies, skills, or project types</li>
-              <li>Get contextual answers about any aspect of Ryan's work</li>
-              <li>
-                <em
-                  >Note: AI responses may not be 100% accurate. Always verify important details.</em
+          <!-- Page 2: Example Questions -->
+          <div id="welcome-page-2" class="welcome-page hidden">
+            <div class="welcome-section">
+              <h3>🔧 Electrical & Manufacturing</h3>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Does he have electrical QA experience?</span
                 >
-              </li>
-            </ul>
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his manufacturing experience</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What power distribution work has he done?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me manufacturing projects</span
+                >
+              </div>
+            </div>
+
+            <div class="welcome-section">
+              <h3>💻 Programming & Software</h3>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What are his software projects?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What programming languages does he use?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me his Python projects</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his GitHub projects</span
+                >
+              </div>
+            </div>
+
+            <div class="welcome-section">
+              <h3>🛠️ Hardware & Hobbies</h3>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What are Ryan's hobbies?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me electronics projects</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his hardware projects</span
+                >
+              </div>
+            </div>
+
+            <div class="welcome-section">
+              <h3>💡 Tips</h3>
+              <ul>
+                <li>Click any suggestion above to auto-fill the message box</li>
+                <li>Ask about specific skills, technologies, or project types</li>
+                <li>Request to see images: "Show me manufacturing projects"</li>
+                <li>Be specific: "What Python libraries has he used?"</li>
+              </ul>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
+          <button id="welcome-prev-page" class="btn secondary-btn" style="display: none">
+            ← Previous
+          </button>
+          <button id="welcome-next-page" class="btn secondary-btn">Next →</button>
           <button id="welcome-got-it" class="btn welcome-btn">Got it! Let's chat</button>
         </div>
       </div>

@@ -12,6 +12,7 @@ from server.chat.bot_user import initialize_bot, get_bot
 from server.db.db import SessionLocal
 from server.db.dbmodels import ChatHistory
 import asyncio
+from server.voice.synth import synthesize_to_base64
 
 
 
@@ -167,7 +168,25 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         "full_message": response_buffer
                     }
                 }))
-                # save the response to db
+                # synthesize the response to base64
+                try:
+                    voice_b64 = synthesize_to_base64(response_buffer)
+                except Exception as e:
+                    print(f"❌ Failed to synthesize voice: {e}")
+                    voice_b64 = None
+
+                # Send final message + optional audio
+                await manager.broadcast(json.dumps({
+                    "event": "bot_message_stream",
+                    "data": {
+                        "user": bot.username,
+                        "chunk": "",
+                        "is_first": False,
+                        "is_complete": True,
+                        "full_message": response_buffer,
+                        "voice_b64": voice_b64  # Base64-encoded WAV
+                    }
+                }))         # save the response to db
                 bot.portfolio_assistant.save_response(cleaned_message, username, response_buffer)
                 
             except Exception as stream_error:

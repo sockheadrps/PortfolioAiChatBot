@@ -13,6 +13,21 @@ let keyPair = null;
 let userPublicKeys = new Map();
 let currentPmUser = null;
 let isPanelHidden = true;
+let isAudioEnabled = true; // Audio toggle state
+let audioVolume = 0.5; // Volume level (0.0 to 1.0)
+let audioPlaybackRate = 1.3; // Playback speed (0.5x to 2.0x)
+let currentAudio = null; // Currently playing audio element
+
+// Background settings
+let backgroundSettings = {
+  brightness: 1.0,
+  decaySpeed: 1.5,
+  driftIntensity: 1.0,
+  glowIntensity: 1.0,
+  trailDuration: 1500,
+  cursorRadius: 100,
+  dotSize: 1.0,
+};
 
 // DOM elements cache
 const elements = {
@@ -40,6 +55,27 @@ const elements = {
   helpModal: document.getElementById('help-modal'),
   helpCloseBtn: document.getElementById('help-close'),
   helpGotItBtn: document.getElementById('help-got-it'),
+  audioToggle: document.getElementById('audio-toggle'),
+  volumeSlider: document.getElementById('volume-slider'),
+  speedToggle: document.getElementById('speed-toggle'),
+  speedDisplay: document.querySelector('.speed-display'),
+  settingsBtn: document.getElementById('settings-btn'),
+  settingsPopup: document.getElementById('settings-popup'),
+  brightnessSlider: document.getElementById('brightness-slider'),
+  brightnessValue: document.getElementById('brightness-value'),
+  decaySlider: document.getElementById('decay-slider'),
+  decayValue: document.getElementById('decay-value'),
+  driftSlider: document.getElementById('drift-slider'),
+  driftValue: document.getElementById('drift-value'),
+  glowSlider: document.getElementById('glow-slider'),
+  glowValue: document.getElementById('glow-value'),
+  trailSlider: document.getElementById('trail-slider'),
+  trailValue: document.getElementById('trail-value'),
+  radiusSlider: document.getElementById('radius-slider'),
+  radiusValue: document.getElementById('radius-value'),
+  dotSizeSlider: document.getElementById('dot-size-slider'),
+  dotSizeValue: document.getElementById('dot-size-value'),
+  resetSettings: document.getElementById('reset-settings'),
 };
 
 // Utility functions
@@ -299,6 +335,30 @@ const socketHandlers = {
       messageHandler.handleStreamingChunk(elements.messages, data.user, data.chunk, data.is_first);
     } else {
       messageHandler.completeStreamingMessage(elements.messages, data.user);
+
+      // ✅ Play TTS audio if provided and audio is enabled
+      if (data.voice_b64 && isAudioEnabled) {
+        // Stop any currently playing audio
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        }
+
+        const audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+        audio.volume = audioVolume;
+        audio.playbackRate = audioPlaybackRate;
+        currentAudio = audio;
+
+        audio.play().catch((err) => {
+          console.error('🔇 Error playing voice audio:', err);
+          currentAudio = null;
+        });
+
+        // Clear current audio reference when it finishes
+        audio.addEventListener('ended', () => {
+          currentAudio = null;
+        });
+      }
     }
   },
 
@@ -719,7 +779,7 @@ function updatePmButtonStates() {
 function ensurePmFooterTab(chatId, userName, status) {
   const footer = document.getElementById('pm-footer');
   if (!footer) {
-    console.error('PM footer not found!'); // Debug log
+    console.error('PM footer not found!');
     return;
   }
 
@@ -907,6 +967,68 @@ function setupWelcomeModalHandlers() {
       hideWelcomeModal();
     }
   });
+
+  // Welcome modal page navigation
+  let currentWelcomePage = 1;
+  const welcomePages = ['welcome-page-1', 'welcome-page-2'];
+  const welcomeModalTitle = document.getElementById('welcome-modal-title');
+  const welcomePrevBtn = document.getElementById('welcome-prev-page');
+  const welcomeNextBtn = document.getElementById('welcome-next-page');
+
+  function showWelcomePage(pageNum) {
+    // Hide all pages
+    welcomePages.forEach((pageId, index) => {
+      const page = document.getElementById(pageId);
+      if (page) {
+        page.classList.toggle('hidden', index + 1 !== pageNum);
+      }
+    });
+
+    // Update navigation buttons
+    if (welcomePrevBtn) {
+      welcomePrevBtn.style.display = pageNum === 1 ? 'none' : 'inline-block';
+    }
+    if (welcomeNextBtn) {
+      welcomeNextBtn.style.display = pageNum === welcomePages.length ? 'none' : 'inline-block';
+    }
+
+    // Show/hide "Got it!" button based on page
+    if (elements.welcomeGotItBtn) {
+      elements.welcomeGotItBtn.style.display = pageNum === 2 ? 'inline-block' : 'none';
+    }
+
+    // Update title
+    if (welcomeModalTitle) {
+      welcomeModalTitle.textContent =
+        pageNum === 1 ? "🤖 Welcome to Ryan's Portfolio Chat" : '💡 What can I ask the bot?';
+    }
+
+    currentWelcomePage = pageNum;
+  }
+
+  // Navigation button handlers
+  if (welcomePrevBtn) {
+    welcomePrevBtn.addEventListener('click', () => {
+      if (currentWelcomePage > 1) {
+        showWelcomePage(currentWelcomePage - 1);
+      }
+    });
+  }
+
+  if (welcomeNextBtn) {
+    welcomeNextBtn.addEventListener('click', () => {
+      if (currentWelcomePage < welcomePages.length) {
+        showWelcomePage(currentWelcomePage + 1);
+      }
+    });
+  }
+
+  // Reset to page 1 when modal is shown
+  const originalShowWelcomeModal = showWelcomeModal;
+  showWelcomeModal = () => {
+    originalShowWelcomeModal();
+    showWelcomePage(1);
+  };
 }
 
 function showHelpModal() {
@@ -1083,7 +1205,7 @@ const backgroundSystem = {
     const spacingX = 15;
     const spacingY = 15;
     const depthRange = 350;
-    const baseSize = 1;
+    const baseSize = 1 * backgroundSettings.dotSize;
 
     const startX = -(gridWidth * spacingX) / 2;
     const startY = -(gridHeight * spacingY) / 2;
@@ -1138,9 +1260,9 @@ const backgroundSystem = {
     if (!this.isEnabled) return;
 
     const time = Date.now() * 0.001;
-    const driftX = Math.sin(time * 0.25) * 8;
-    const driftY = Math.cos(time * 0.25) * 6;
-    const driftZ = Math.sin(time * 0.2) * 3;
+    const driftX = Math.sin(time * 0.25) * 8 * backgroundSettings.driftIntensity;
+    const driftY = Math.cos(time * 0.25) * 6 * backgroundSettings.driftIntensity;
+    const driftZ = Math.sin(time * 0.2) * 3 * backgroundSettings.driftIntensity;
 
     this.particles.forEach((particle) => {
       const currentX = particle.userData.world3D.x + driftX;
@@ -1159,28 +1281,33 @@ const backgroundSystem = {
       particle.userData.screenY = screenY;
 
       const distance = Math.sqrt((this.mouseX - screenX) ** 2 + (this.mouseY - screenY) ** 2);
+      const cursorRadius = backgroundSettings.cursorRadius;
 
-      if (distance <= 100) {
-        const intensity = 1 - distance / 100;
-        particle.userData.targetOpacity = particle.userData.originalOpacity + intensity * 1.2;
+      if (distance <= cursorRadius) {
+        const intensity = 1 - distance / cursorRadius;
+        particle.userData.targetOpacity =
+          particle.userData.originalOpacity * backgroundSettings.brightness +
+          intensity * 1.2 * backgroundSettings.glowIntensity;
         particle.userData.targetColor = new THREE.Color(1, 0.42, 0.42);
         particle.userData.lastGlowTime = Date.now();
       } else {
         const timeSinceGlow = Date.now() - (particle.userData.lastGlowTime || 0);
-        const trailDuration = 1500;
+        const trailDuration = backgroundSettings.trailDuration;
 
         if (timeSinceGlow < trailDuration) {
           const fadeProgress = timeSinceGlow / trailDuration;
           const trailIntensity = 1 - fadeProgress;
           particle.userData.targetOpacity =
-            particle.userData.originalOpacity + trailIntensity * 0.8;
+            particle.userData.originalOpacity * backgroundSettings.brightness +
+            trailIntensity * 0.8 * backgroundSettings.glowIntensity;
         } else {
-          particle.userData.targetOpacity = particle.userData.originalOpacity;
+          particle.userData.targetOpacity =
+            particle.userData.originalOpacity * backgroundSettings.brightness;
           particle.userData.targetColor = new THREE.Color(1, 1, 1);
         }
       }
 
-      const lerpSpeed = 0.02;
+      const lerpSpeed = 0.02 * backgroundSettings.decaySpeed;
       particle.material.opacity = THREE.MathUtils.lerp(
         particle.material.opacity,
         particle.userData.targetOpacity,
@@ -1203,6 +1330,17 @@ const backgroundSystem = {
       this.renderLoopStarted = true;
       requestAnimationFrame(animate);
     }
+  },
+
+  updateParticleSizes() {
+    const baseSize = 1 * backgroundSettings.dotSize;
+    this.particles.forEach((particle) => {
+      // Create new geometry with updated size
+      const newGeometry = new THREE.CircleGeometry(baseSize, 8);
+      particle.geometry.dispose();
+      particle.geometry = newGeometry;
+      particle.userData.originalSize = baseSize;
+    });
   },
 };
 
@@ -1311,6 +1449,255 @@ if (elements.botToggle && elements.input) {
   });
 }
 
+// Audio toggle functionality
+if (elements.audioToggle) {
+  const updateAudioState = () => {
+    if (isAudioEnabled) {
+      elements.audioToggle.classList.add('active');
+      elements.audioToggle.querySelector('span').textContent = '🔊';
+      elements.audioToggle.title = 'Audio Enabled (Click to disable)';
+    } else {
+      elements.audioToggle.classList.remove('active');
+      elements.audioToggle.querySelector('span').textContent = '🔇';
+      elements.audioToggle.title = 'Audio Disabled (Click to enable)';
+    }
+  };
+
+  updateAudioState();
+
+  elements.audioToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    isAudioEnabled = !isAudioEnabled;
+
+    // If audio is being disabled, stop any currently playing audio
+    if (!isAudioEnabled && currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+
+    updateAudioState();
+  });
+} else {
+  console.error('🔊 Audio toggle element not found!');
+}
+
+// Volume slider functionality
+if (elements.volumeSlider) {
+  // Set initial volume
+  elements.volumeSlider.value = audioVolume * 100;
+
+  elements.volumeSlider.addEventListener('input', (e) => {
+    audioVolume = e.target.value / 100;
+
+    // Apply volume change to currently playing audio
+    if (currentAudio) {
+      currentAudio.volume = audioVolume;
+    }
+  });
+
+  // Prevent volume slider from triggering audio toggle
+  elements.volumeSlider.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+} else {
+  console.error('🔊 Volume slider element not found!');
+}
+
+// Speed control functionality
+if (elements.speedToggle) {
+  // Set initial speed display
+  if (elements.speedDisplay) {
+    elements.speedDisplay.textContent = audioPlaybackRate.toFixed(1) + 'x';
+  }
+
+  // Mouse wheel event handler
+  elements.speedToggle.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    // Determine scroll direction and adjust speed
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newSpeed = Math.max(0.5, Math.min(2.0, audioPlaybackRate + delta));
+
+    // Only update if speed actually changed
+    if (newSpeed !== audioPlaybackRate) {
+      audioPlaybackRate = newSpeed;
+
+      // Update speed display
+      if (elements.speedDisplay) {
+        elements.speedDisplay.textContent = audioPlaybackRate.toFixed(1) + 'x';
+      }
+
+      // Apply speed change to currently playing audio
+      if (currentAudio) {
+        currentAudio.playbackRate = audioPlaybackRate;
+      }
+    }
+  });
+
+  // Prevent default click behavior
+  elements.speedToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+  });
+} else {
+  console.error('⚡ Speed control element not found!');
+}
+
+// Settings functionality
+if (elements.settingsBtn) {
+  // Toggle settings popup
+  elements.settingsBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    elements.settingsPopup.classList.toggle('hidden');
+  });
+
+  // Close settings when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!elements.settingsPopup.contains(e.target) && !elements.settingsBtn.contains(e.target)) {
+      elements.settingsPopup.classList.add('hidden');
+    }
+  });
+
+  // Initialize sliders with current values
+  if (elements.brightnessSlider) {
+    elements.brightnessSlider.value = backgroundSettings.brightness * 100;
+    elements.brightnessValue.textContent = Math.round(backgroundSettings.brightness * 100) + '%';
+
+    elements.brightnessSlider.addEventListener('input', (e) => {
+      backgroundSettings.brightness = e.target.value / 100;
+      elements.brightnessValue.textContent = e.target.value + '%';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.decaySlider) {
+    elements.decaySlider.value = backgroundSettings.decaySpeed * 100;
+    elements.decayValue.textContent = Math.round(backgroundSettings.decaySpeed * 100) + '%';
+
+    elements.decaySlider.addEventListener('input', (e) => {
+      backgroundSettings.decaySpeed = e.target.value / 100;
+      elements.decayValue.textContent = e.target.value + '%';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.driftSlider) {
+    elements.driftSlider.value = backgroundSettings.driftIntensity * 100;
+    elements.driftValue.textContent = Math.round(backgroundSettings.driftIntensity * 100) + '%';
+
+    elements.driftSlider.addEventListener('input', (e) => {
+      backgroundSettings.driftIntensity = e.target.value / 100;
+      elements.driftValue.textContent = e.target.value + '%';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.glowSlider) {
+    elements.glowSlider.value = backgroundSettings.glowIntensity * 100;
+    elements.glowValue.textContent = Math.round(backgroundSettings.glowIntensity * 100) + '%';
+
+    elements.glowSlider.addEventListener('input', (e) => {
+      backgroundSettings.glowIntensity = e.target.value / 100;
+      elements.glowValue.textContent = e.target.value + '%';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.trailSlider) {
+    elements.trailSlider.value = backgroundSettings.trailDuration;
+    elements.trailValue.textContent = (backgroundSettings.trailDuration / 1000).toFixed(1) + 's';
+
+    elements.trailSlider.addEventListener('input', (e) => {
+      backgroundSettings.trailDuration = parseInt(e.target.value);
+      elements.trailValue.textContent = (backgroundSettings.trailDuration / 1000).toFixed(1) + 's';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.radiusSlider) {
+    elements.radiusSlider.value = backgroundSettings.cursorRadius;
+    elements.radiusValue.textContent = backgroundSettings.cursorRadius + 'px';
+
+    elements.radiusSlider.addEventListener('input', (e) => {
+      backgroundSettings.cursorRadius = parseInt(e.target.value);
+      elements.radiusValue.textContent = backgroundSettings.cursorRadius + 'px';
+      updateBackgroundSettings();
+    });
+  }
+
+  if (elements.dotSizeSlider) {
+    elements.dotSizeSlider.value = backgroundSettings.dotSize * 100;
+    elements.dotSizeValue.textContent = Math.round(backgroundSettings.dotSize * 100) + '%';
+
+    elements.dotSizeSlider.addEventListener('input', (e) => {
+      backgroundSettings.dotSize = e.target.value / 100;
+      elements.dotSizeValue.textContent = e.target.value + '%';
+      updateBackgroundSettings();
+    });
+  }
+
+  // Reset settings
+  if (elements.resetSettings) {
+    elements.resetSettings.addEventListener('click', () => {
+      backgroundSettings = {
+        brightness: 1.0,
+        decaySpeed: 1.5,
+        driftIntensity: 1.0,
+        glowIntensity: 1.0,
+        trailDuration: 1500,
+        cursorRadius: 100,
+        dotSize: 1.0,
+      };
+
+      // Update sliders
+      if (elements.brightnessSlider) {
+        elements.brightnessSlider.value = 100;
+        elements.brightnessValue.textContent = '100%';
+      }
+      if (elements.decaySlider) {
+        elements.decaySlider.value = 150;
+        elements.decayValue.textContent = '150%';
+      }
+      if (elements.driftSlider) {
+        elements.driftSlider.value = 100;
+        elements.driftValue.textContent = '100%';
+      }
+      if (elements.glowSlider) {
+        elements.glowSlider.value = 100;
+        elements.glowValue.textContent = '100%';
+      }
+      if (elements.trailSlider) {
+        elements.trailSlider.value = 1500;
+        elements.trailValue.textContent = '1.5s';
+      }
+      if (elements.radiusSlider) {
+        elements.radiusSlider.value = 100;
+        elements.radiusValue.textContent = '100px';
+      }
+      if (elements.dotSizeSlider) {
+        elements.dotSizeSlider.value = 100;
+        elements.dotSizeValue.textContent = '100%';
+      }
+
+      updateBackgroundSettings();
+    });
+  }
+} else {
+  console.error('⚙️ Settings button not found!');
+}
+
+// Function to update background settings
+function updateBackgroundSettings() {
+  if (backgroundSystem.isEnabled) {
+    // The background system will use these settings in its update loop
+
+    // Update particle sizes if dot size changed
+    if (backgroundSystem.updateParticleSizes) {
+      backgroundSystem.updateParticleSizes();
+    }
+  }
+}
+
 // Initialize Three.js background
 window.addEventListener('load', () => {
   setTimeout(() => {
@@ -1320,6 +1707,96 @@ window.addEventListener('load', () => {
     }
     backgroundSystem.init();
   }, 500);
+});
+
+// Tooltip system
+function createTooltip(text) {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'tooltip';
+  tooltip.textContent = text;
+  return tooltip;
+}
+
+function showTooltip(button, text) {
+  const tooltipContainer = document.getElementById('tooltip-container');
+  const tooltip = createTooltip(text);
+  tooltipContainer.appendChild(tooltip);
+
+  const rect = button.getBoundingClientRect();
+  const tooltipHeight = 30;
+  const arrowHeight = 5;
+
+  // Position tooltip above the button
+  tooltip.style.top = rect.top - tooltipHeight - arrowHeight - 8 + 'px';
+  tooltip.style.left = rect.left + rect.width / 2 + 'px';
+  tooltip.style.transform = 'translateX(-50%)';
+
+  // Show tooltip
+  setTimeout(() => tooltip.classList.add('show'), 10);
+
+  return tooltip;
+}
+
+function hideTooltip(tooltip) {
+  if (tooltip) {
+    tooltip.classList.remove('show');
+    setTimeout(() => {
+      if (tooltip.parentNode) {
+        tooltip.parentNode.removeChild(tooltip);
+      }
+    }, 200);
+  }
+}
+
+// Add tooltip functionality to buttons
+document.addEventListener('DOMContentLoaded', () => {
+  const tooltipButtons = document.querySelectorAll('.audio-btn, .speed-btn, .help-btn');
+  let currentTooltip = null;
+
+  tooltipButtons.forEach((button) => {
+    const tooltipText = button.getAttribute('data-tooltip');
+
+    button.addEventListener('mouseenter', () => {
+      if (tooltipText) {
+        currentTooltip = showTooltip(button, tooltipText);
+      }
+    });
+
+    button.addEventListener('mouseleave', () => {
+      hideTooltip(currentTooltip);
+      currentTooltip = null;
+    });
+  });
+});
+
+// Tooltip positioning
+function updateTooltipPosition(button, tooltip, arrow) {
+  const rect = button.getBoundingClientRect();
+  const tooltipHeight = 30; // Approximate tooltip height
+  const arrowHeight = 5;
+
+  // Position tooltip above the button
+  tooltip.style.top = rect.top - tooltipHeight - arrowHeight - 8 + 'px';
+  tooltip.style.left = rect.left + rect.width / 2 + 'px';
+
+  // Position arrow
+  arrow.style.top = rect.top - arrowHeight - 8 + 'px';
+  arrow.style.left = rect.left + rect.width / 2 + 'px';
+}
+
+// Add tooltip positioning to buttons
+document.addEventListener('DOMContentLoaded', () => {
+  const tooltipButtons = document.querySelectorAll('.audio-btn, .speed-btn, .help-btn');
+
+  tooltipButtons.forEach((button) => {
+    button.addEventListener('mouseenter', () => {
+      const tooltip = button.querySelector('::before');
+      const arrow = button.querySelector('::after');
+      if (tooltip && arrow) {
+        updateTooltipPosition(button, tooltip, arrow);
+      }
+    });
+  });
 });
 
 // Gallery event listeners
