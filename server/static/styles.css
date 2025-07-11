@@ -1041,40 +1041,12 @@ body {
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid rgba(102, 126, 234, 0.3);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.1));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(204, 0, 0, 0.02);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: 0 0 10px 10px;
   position: relative;
-}
-
-/* Add subtle gradient overlay to match color palette */
-#chat-form::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.03));
-  border-radius: 0 0 10px 10px;
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Add subtle inner glow to chat form */
-#chat-form::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  border-radius: 0px 0px 10px 10px;
-  pointer-events: none;
-  z-index: -1;
 }
 
 /* Bot Toggle Styling */
@@ -1089,15 +1061,16 @@ body {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 25px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   white-space: nowrap;
   opacity: 0.6;
   position: relative;
@@ -1120,11 +1093,12 @@ body {
 }
 
 .bot-robot-button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
   opacity: 0.8;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
 }
 
 .bot-robot-button.active {
@@ -1181,9 +1155,9 @@ body {
 #message-input {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid rgba(102, 126, 234, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 25px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.08));
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-white);
   font-size: 15px;
   outline: none;
@@ -1193,24 +1167,10 @@ body {
   position: relative;
 }
 
-/* Add subtle inner glow to message input */
-#message-input::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.05));
-  border-radius: 25px;
-  pointer-events: none;
-  z-index: -1;
-}
-
 #message-input:focus {
-  border-color: rgba(102, 126, 234, 0.8);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.15));
-  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4), 0 0 0 1px rgba(102, 126, 234, 0.3) inset;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
   transform: translateY(-1px);
 }
 
@@ -3157,7 +3117,11 @@ canvas {
   }
   #messages {
     padding: 0px;
-    margin-bottom: 10px;
+    font-size: 14px;
+  }
+
+  .message-text {
+    font-size: 10px;
   }
 
   #chat-form button {
@@ -3334,8 +3298,9 @@ body.modal-open {
         margin-left: 0px;
       }
       #chat-container {
-        margin-top: 70px;
         max-width: 85%;
+        max-height: 90%;
+        left: 20px;
         margin-left: 10px;
       }
 
@@ -3352,8 +3317,7 @@ body.modal-open {
         left: 0;
         top: calc(60px + env(safe-area-inset-top, 0px));
         height: 80%;
-        padding-top: 20px;
-        top: 70px;
+        top: 60px;
       }
 
       #users-panel.hidden {
@@ -3365,7 +3329,7 @@ body.modal-open {
         z-index: 101;
         border-left: none;
         transition: left 0.3s ease;
-        top: 70px;
+        top: -50px;
       }
 
       .users-toggle.panel-hidden {
@@ -3400,7 +3364,6 @@ body.modal-open {
       }
       #messages {
         padding: 0px;
-        margin-bottom: 10px;
       }
 
       #chat-form button {
@@ -3465,6 +3428,4 @@ body.modal-open {
   background-color: rgba(255, 255, 255, 0.08);
 }
 
-#chat-form {
-  background-color: rgba(24, 24, 24, 0.98);
-}
+

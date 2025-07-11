@@ -1,8 +1,9 @@
 // WebSocket Configuration
 const WS_CONFIG = {
-  LOCAL_WS_URL: 'ws://localhost:8080/ws',
+  LOCAL_WS_URL: `ws://${window.location.hostname}:8080/ws`,
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
-  ACTIVE_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
+  // ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
+  ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
 };
 
 // State management
@@ -503,13 +504,21 @@ const socketHandlers = {
         const existingTab = document.getElementById(`pm-tab-${user}`);
         const hasPmChat = existingTab !== null;
 
+        const isEncryptionAvailable = utils.isCryptoAvailable();
+        const pmDisabled = hasPmChat || !isEncryptionAvailable;
+        const pmTitle = hasPmChat
+          ? 'PM chat already open'
+          : !isEncryptionAvailable
+          ? 'Private messages require HTTPS or localhost'
+          : 'Send PM invite';
+
         li.innerHTML = `
         <span class="user-name">${user}</span>
-        <button class="pm-button ${hasPmChat ? 'disabled' : ''}" 
-                onclick="${hasPmChat ? 'return false;' : `sendPmInvite('${user}')`}" 
-                ${hasPmChat ? 'disabled' : ''}
-                title="${hasPmChat ? 'PM chat already open' : 'Send PM invite'}">
-          ${hasPmChat ? '✓' : 'PM'}
+        <button class="pm-button ${pmDisabled ? 'disabled' : ''}" 
+                onclick="${pmDisabled ? 'return false;' : `sendPmInvite('${user}')`}" 
+                ${pmDisabled ? 'disabled' : ''}
+                title="${pmTitle}">
+          ${hasPmChat ? '✓' : !isEncryptionAvailable ? '🔒' : 'PM'}
         </button>
       `;
         if (!isPanelHidden) {
@@ -1622,9 +1631,17 @@ window.addEventListener('DOMContentLoaded', () => {
   elements.usersToggle.textContent = '👥';
   elements.usersToggle.title = 'Show Users Panel';
 
-  utils.generateKeyPair().catch((error) => {
-    console.error('Failed to generate RSA key pair:', error);
-  });
+  // Only generate RSA key pair if Web Crypto API is available (HTTPS or localhost)
+  if (utils.isCryptoAvailable()) {
+    utils.generateKeyPair().catch((error) => {
+      console.error('Failed to generate RSA key pair:', error);
+    });
+  } else {
+    console.log(
+      '🔐 Skipping RSA key generation - Web Crypto API not available (requires HTTPS or localhost)'
+    );
+    console.log('🔐 Private messages will not be available');
+  }
 
   elements.connectingOverlay?.classList.remove('hidden');
   setupSocket();
