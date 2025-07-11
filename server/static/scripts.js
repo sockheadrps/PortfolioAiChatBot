@@ -2,7 +2,7 @@
 const WS_CONFIG = {
   LOCAL_WS_URL: 'ws://localhost:8080/ws',
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
-  ACTIVE_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
+  ACTIVE_WS_URL: 'ws://localhost:8080/ws',
 };
 
 // State management
@@ -382,8 +382,6 @@ const socketHandlers = {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const isIOSSafari = isIOS && isSafari;
-        // Uncomment the line below to force Blob URL approach for testing
-        // const isIOSSafari = true;
 
         // Debug logging
         console.log('🔍 Device Detection:', {
@@ -438,13 +436,6 @@ const socketHandlers = {
         // iOS-compatible play with multiple fallbacks
         const playAudio = async () => {
           try {
-            // Check if user has interacted (required for iOS)
-            if (!userHasInteracted) {
-              console.log('🔇 Waiting for user interaction before playing audio...');
-              pendingAudio = audio; // Queue audio for later
-              return; // Don't try to play until user interacts
-            }
-
             // Try to play immediately
             await audio.play();
           } catch (err) {
@@ -461,12 +452,17 @@ const socketHandlers = {
                 console.error('🔇 Audio play failed after retry:', retryErr);
                 currentAudio = null;
 
-                // Show user-friendly message for iOS users
-                if (retryErr.name === 'NotAllowedError') {
-                  messageHandler.addSystemMessage(
-                    elements.messages,
-                    '🔇 Audio blocked by browser. Try tapping the audio button or interacting with the page first.'
-                  );
+                // Add play button for iOS users when auto-play fails
+                if (isIOSSafari) {
+                  addPlayAudioButton(audio, data.voice_b64);
+                } else {
+                  // Show user-friendly message for other browsers
+                  if (retryErr.name === 'NotAllowedError') {
+                    messageHandler.addSystemMessage(
+                      elements.messages,
+                      '🔇 Audio blocked by browser. Try tapping the audio button or interacting with the page first.'
+                    );
+                  }
                 }
               }
             }, 100);
@@ -609,6 +605,89 @@ const socketHandlers = {
     }
   },
 };
+
+// Function to add play audio button for iOS users
+function addPlayAudioButton(audio, voiceB64) {
+  // Find the last bot message
+  const messages = document.querySelectorAll('.message.bot');
+  if (messages.length === 0) return;
+
+  const lastBotMessage = messages[messages.length - 1];
+
+  // Check if play button already exists
+  if (lastBotMessage.querySelector('.ios-play-audio-btn')) return;
+
+  // Create play button
+  const playButton = document.createElement('button');
+  playButton.className = 'ios-play-audio-btn';
+  playButton.innerHTML = '🔊 Play Audio';
+  playButton.title = 'Tap to play audio (iOS Safari)';
+
+  // Style the button
+  playButton.style.cssText = `
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  `;
+
+  // Add hover effects
+  playButton.addEventListener('mouseenter', () => {
+    playButton.style.transform = 'translateY(-1px)';
+    playButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+  });
+
+  playButton.addEventListener('mouseleave', () => {
+    playButton.style.transform = 'translateY(0)';
+    playButton.style.boxShadow = 'none';
+  });
+
+  // Add click handler
+  playButton.addEventListener('click', async () => {
+    try {
+      // Mark user interaction
+      if (!userHasInteracted) {
+        userHasInteracted = true;
+      }
+
+      // Try to play the audio
+      await audio.play();
+
+      // Remove the button after successful play
+      playButton.remove();
+
+      console.log('🔊 iOS audio played successfully via button');
+    } catch (err) {
+      console.error('🔇 iOS audio play failed via button:', err);
+
+      // Update button text to show error
+      playButton.innerHTML = '❌ Play Failed';
+      playButton.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+      playButton.disabled = true;
+
+      // Reset after 3 seconds
+      setTimeout(() => {
+        playButton.innerHTML = '🔊 Play Audio';
+        playButton.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        playButton.disabled = false;
+      }, 3000);
+    }
+  });
+
+  // Add the button to the message
+  lastBotMessage.appendChild(playButton);
+
+  console.log('🔊 Added iOS play audio button');
+}
 
 // WebSocket setup
 function setupSocket() {

@@ -169,6 +169,7 @@ body {
   padding: 20px;
   margin-left: 292px;
   transition: margin-left 0.3s ease;
+  max-width: 100%;
 }
 
 .main-container.panel-hidden {
@@ -757,6 +758,7 @@ body {
 #messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
   scroll-behavior: smooth;
@@ -840,8 +842,12 @@ body {
 .message.bot .message-text {
   white-space: pre-wrap;
   word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
   display: block;
   margin-top: 2px;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .message.bot .user-name {
@@ -2151,7 +2157,7 @@ body {
 
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  
+
   background-color: rgba(17, 25, 40, 0.5); /* subtle dark glass tint */
   box-shadow: inset 0 0 0 1000px rgba(255, 255, 255, 0.02); /* soft inner glow */
 
@@ -2167,7 +2173,6 @@ body {
 
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
-
 
 canvas {
   position: fixed !important;
@@ -3152,6 +3157,7 @@ canvas {
   }
   #messages {
     padding: 0px;
+    margin-bottom: 10px;
   }
 
   #chat-form button {
@@ -3312,8 +3318,6 @@ body.modal-open {
 
     /* Even smaller screens */
     @media screen and (max-width: 480px) {
-
-
       .layout-container {
         height: calc(
           100vh - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
