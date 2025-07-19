@@ -13,7 +13,6 @@ from server.db.db import init_db
 from server.auth.routes import router as auth_router
 from server.chat.routes import router as chat_router
 from server.pages.routes import router as pages_router
-from server.chat.routes import router as websocket_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +21,6 @@ app = FastAPI()
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(pages_router)
-app.include_router(websocket_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,19 +47,17 @@ app.add_middleware(
     ],
 )
 
-app.mount("/static", StaticFiles(directory=BASE_DIR / "server" / "static"), name="static")
+app.mount("/static", StaticFiles(directory=BASE_DIR /
+          "server" / "static"), name="static")
 app.templates = templates
 
 
 DATA_PATH = Path("data.json")
+
 
 @app.get("/form", response_class=HTMLResponse)
 async def get_form(request: Request):
     return templates.TemplateResponse("form.html", {"request": request})
 
 
-
-
 init_db()
-
-

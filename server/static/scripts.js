@@ -2,8 +2,8 @@
 const WS_CONFIG = {
   LOCAL_WS_URL: `ws://${window.location.hostname}:8080/ws`,
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
-  // ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
-  ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
+  ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
+  // ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
 };
 
 // State management
@@ -22,14 +22,14 @@ let userHasInteracted = false; // Track if user has interacted (required for iOS
 let pendingAudio = null; // Audio waiting to be played after user interaction
 
 // Background settings
-let backgroundSettings = {
+const backgroundSettings = {
+  dotSize: 1.2,
   brightness: 1.0,
-  decaySpeed: 1.5,
+  glowIntensity: 0.9,
   driftIntensity: 1.0,
-  glowIntensity: 1.0,
-  trailDuration: 1500,
-  cursorRadius: 100,
-  dotSize: 1.0,
+  cursorRadius: 150,
+  trailDuration: 600,
+  decaySpeed: 1.0,
 };
 
 // DOM elements cache
@@ -79,6 +79,8 @@ const elements = {
   dotSizeSlider: document.getElementById('dot-size-slider'),
   dotSizeValue: document.getElementById('dot-size-value'),
   resetSettings: document.getElementById('reset-settings'),
+  infoToggle: document.getElementById('info-toggle'),
+  infoPanel: document.getElementById('info-panel'),
 };
 
 // Utility functions
@@ -512,8 +514,9 @@ const socketHandlers = {
           ? 'Private messages require HTTPS or localhost'
           : 'Send PM invite';
 
+        // Store the backend username as a data attribute for PM functionality
         li.innerHTML = `
-        <span class="user-name">${user}</span>
+        <span class="user-name" data-backend-username="${user}">${user}</span>
         <button class="pm-button ${pmDisabled ? 'disabled' : ''}" 
                 onclick="${pmDisabled ? 'return false;' : `sendPmInvite('${user}')`}" 
                 ${pmDisabled ? 'disabled' : ''}
@@ -547,7 +550,7 @@ const socketHandlers = {
     sendPublicKey(data.from);
   },
 
-  pubkey_response: async (data) => {
+  pubkey_response: async (data) => {  
     try {
       const publicKey = await utils.importPublicKey(data.public_key);
       userPublicKeys.set(data.from, publicKey);
@@ -593,7 +596,7 @@ const socketHandlers = {
       );
       setPrivateChatEnabled(false);
       if (elements.privateChatMinimize) {
-        elements.privateChatMinimize.style.display = 'none';
+      elements.privateChatMinimize.style.display = 'none';
       }
       // Clear the current PM user since they disconnected
       currentPmUser = null;
@@ -612,6 +615,16 @@ const socketHandlers = {
         ImageGalleryController.showGallery(images, title);
       });
     }
+  },
+
+  display_name_change: (data) => {
+    // Update the user's display name in the user list
+    const userElements = document.querySelectorAll('.online-user .user-name');
+    userElements.forEach((element) => {
+      if (element.getAttribute('data-backend-username') === data.username) {
+        element.textContent = data.displayName;
+      }
+    });
   },
 };
 
@@ -706,7 +719,6 @@ function setupSocket() {
     elements.form.style.pointerEvents = 'auto';
     elements.form.style.opacity = '1';
     elements.connectingOverlay?.classList.add('hidden');
-    setTimeout(() => showWelcomeModal(), 500);
   });
 
   socket.addEventListener('message', (event) => {
@@ -716,7 +728,7 @@ function setupSocket() {
       if (handler) {
         handler(data.data || data);
       } else if (typeof data === 'string') {
-        messageHandler.addMessage(elements.messages, 'System', data, 'bot');
+          messageHandler.addMessage(elements.messages, 'System', data, 'bot');
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
@@ -786,18 +798,18 @@ async function sendPublicKey(username) {
 
 function acceptPmInvite(user, toast) {
   try {
-    socket.send(JSON.stringify({ type: 'pm_accept', to: user }));
-    ensurePmFooterTab(user, user, 'accepted');
-    openPrivateChat(user);
+  socket.send(JSON.stringify({ type: 'pm_accept', to: user }));
+  ensurePmFooterTab(user, user, 'accepted');
+  openPrivateChat(user);
 
     // Remove the toast notification
     if (toast && toast.remove) {
-      toast.remove();
+  toast.remove();
     } else if (toast && toast.parentNode) {
       toast.parentNode.removeChild(toast);
     }
 
-    requestPublicKey(user);
+  requestPublicKey(user);
   } catch (error) {
     console.error('Error accepting PM invite:', error);
     // Still try to remove the toast even if there's an error
@@ -811,51 +823,51 @@ function acceptPmInvite(user, toast) {
 
 function openPrivateChat(user) {
   try {
-    currentPmUser = user;
+  currentPmUser = user;
 
     // Check if elements exist before accessing them
     if (elements.privateChatContainer) {
-      elements.privateChatContainer.style.display = 'flex';
-      elements.privateChatContainer.classList.remove('hidden');
-      elements.privateChatContainer.dataset.user = user;
+  elements.privateChatContainer.style.display = 'flex';
+  elements.privateChatContainer.classList.remove('hidden');
+  elements.privateChatContainer.dataset.user = user;
     }
 
-    const chatUserName = document.getElementById('chat-user-name');
+  const chatUserName = document.getElementById('chat-user-name');
     if (chatUserName) chatUserName.textContent = `with ${user}`;
 
     // Show control buttons
     if (elements.privateChatMinimize) {
-      elements.privateChatMinimize.style.display = 'inline-block';
+  elements.privateChatMinimize.style.display = 'inline-block';
     }
     if (elements.privateChatClose) {
-      elements.privateChatClose.style.display = 'inline-block';
+  elements.privateChatClose.style.display = 'inline-block';
     }
 
     if (elements.privateChatBox) {
-      elements.privateChatBox.innerHTML = '';
-      const messages = pmSessions.get(user) || [];
+  elements.privateChatBox.innerHTML = '';
+  const messages = pmSessions.get(user) || [];
 
-      if (messages.length === 0) {
-        messageHandler.addSystemMessage(
-          elements.privateChatBox,
-          `Private chat with <b>${user}</b> started.`
-        );
-      } else {
-        messages.forEach(({ from, text }) => {
-          messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
-        });
+  if (messages.length === 0) {
+    messageHandler.addSystemMessage(
+      elements.privateChatBox,
+      `Private chat with <b>${user}</b> started.`
+    );
+  } else {
+    messages.forEach(({ from, text }) => {
+      messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
+    });
       }
-    }
+  }
 
-    activateTab(user);
-    const tab = document.getElementById(`pm-tab-${user}`);
-    if (tab?.classList.contains('disconnected')) {
-      setPrivateChatEnabled(false);
+  activateTab(user);
+  const tab = document.getElementById(`pm-tab-${user}`);
+  if (tab?.classList.contains('disconnected')) {
+    setPrivateChatEnabled(false);
       if (elements.privateChatMinimize) {
-        elements.privateChatMinimize.style.display = 'none';
+    elements.privateChatMinimize.style.display = 'none';
       }
-    } else {
-      setPrivateChatEnabled(true);
+  } else {
+    setPrivateChatEnabled(true);
     }
   } catch (error) {
     console.error('Error opening private chat:', error);
@@ -1128,14 +1140,12 @@ function toggleUsersPanel() {
 
   if (isPanelHidden) {
     elements.usersPanel.classList.add('hidden');
-    elements.mainContainer.classList.add('panel-hidden');
     elements.usersToggle.classList.add('panel-hidden');
     elements.usersToggle.textContent = '👥';
     elements.usersToggle.title = 'Show Users Panel';
   } else {
     elements.usersPanel.classList.add('panel-loading');
     elements.usersPanel.classList.remove('hidden');
-    elements.mainContainer.classList.remove('panel-hidden');
     elements.usersToggle.classList.remove('panel-hidden');
     elements.usersToggle.textContent = '◀';
     elements.usersToggle.title = 'Hide Users Panel';
@@ -1152,6 +1162,23 @@ function toggleUsersPanel() {
         });
       }, 50);
     }, 50);
+  }
+}
+
+// Info panel toggle
+function toggleInfoPanel() {
+  const isInfoPanelHidden = elements.infoPanel.classList.contains('hidden');
+
+  if (isInfoPanelHidden) {
+    elements.infoPanel.classList.remove('hidden');
+    elements.infoToggle.classList.remove('panel-hidden');
+    elements.infoToggle.textContent = '◀';
+    elements.infoToggle.title = 'Hide Info Panel';
+  } else {
+    elements.infoPanel.classList.add('hidden');
+    elements.infoToggle.classList.add('panel-hidden');
+    elements.infoToggle.textContent = '▶';
+    elements.infoToggle.title = 'Show Info Panel';
   }
 }
 
@@ -1373,15 +1400,17 @@ const ImageGalleryController = {
   },
 };
 
-// Three.js Background System (Simplified)
 const backgroundSystem = {
   scene: null,
   camera: null,
   renderer: null,
-  particles: [],
+  instancedMesh: null,
   mouseX: 0,
   mouseY: 0,
   isEnabled: false,
+  instanceCount: 0,
+  dummy: new THREE.Object3D(),
+  tempColor: new THREE.Color(),
 
   init() {
     try {
@@ -1418,7 +1447,6 @@ const backgroundSystem = {
   },
 
   createParticles() {
-    this.particles = [];
     const gridWidth = 90;
     const gridHeight = 50;
     const spacingX = 15;
@@ -1429,6 +1457,48 @@ const backgroundSystem = {
     const startX = -(gridWidth * spacingX) / 2;
     const startY = -(gridHeight * spacingY) / 2;
 
+    const geometry = new THREE.CircleGeometry(baseSize, 8);
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      vertexShader: `
+        attribute vec3 instanceColor;
+        attribute float instanceOpacity;
+        varying vec3 vColor;
+        varying float vOpacity;
+    
+        void main() {
+          vColor = instanceColor;
+          vOpacity = instanceOpacity;
+          vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vOpacity;
+    
+        void main() {
+          gl_FragColor = vec4(vColor, vOpacity);
+        }
+      `,
+    });
+
+    this.instanceCount = gridWidth * gridHeight;
+    this.instancedMesh = new THREE.InstancedMesh(geometry, material, this.instanceCount);
+    const instanceColorBuffer = new THREE.InstancedBufferAttribute(
+      new Float32Array(this.instanceCount * 3),
+      3
+    );
+    const instanceOpacityBuffer = new THREE.InstancedBufferAttribute(
+      new Float32Array(this.instanceCount),
+      1
+    );
+    this.instancedMesh.geometry.setAttribute('instanceColor', instanceColorBuffer);
+    this.instancedMesh.geometry.setAttribute('instanceOpacity', instanceOpacityBuffer);
+
+    this.instanceData = [];
+
+    let index = 0;
     for (let x = 0; x < gridWidth; x++) {
       for (let y = 0; y < gridHeight; y++) {
         const posX = startX + x * spacingX;
@@ -1436,104 +1506,122 @@ const backgroundSystem = {
         const depthProgress = (gridHeight - 1 - y) / (gridHeight - 1);
         const posZ = depthRange * (depthProgress - 0.8);
 
-        const material = new THREE.MeshBasicMaterial({
-          color: new THREE.Color(1, 1, 1),
-          transparent: true,
+        this.instanceData.push({
+          basePos: new THREE.Vector3(posX, posY, posZ),
           opacity: 0.15,
+          color: new THREE.Color(1, 1, 1),
+          lastGlowTime: 0,
         });
 
-        const geometry = new THREE.CircleGeometry(baseSize, 8);
-        const particle = new THREE.Mesh(geometry, material);
-        particle.position.set(posX, posY, posZ);
+        // Initial transform
+        this.dummy.position.copy(this.instanceData[index].basePos);
+        this.dummy.scale.set(1, 1, 1);
+        this.dummy.updateMatrix();
+        this.instancedMesh.setMatrixAt(index, this.dummy.matrix);
 
-        particle.userData = {
-          screenX: 0,
-          screenY: 0,
-          world3D: { x: posX, y: posY, z: posZ },
-          originalOpacity: 0.15,
-          originalSize: baseSize,
-          targetOpacity: 0.15,
-          targetColor: new THREE.Color(1, 1, 1),
-        };
+        // Set initial color and opacity in the attributes
+        const colorArray = this.instancedMesh.geometry.attributes.instanceColor.array;
+        const opacityArray = this.instancedMesh.geometry.attributes.instanceOpacity.array;
+        colorArray[index * 3] = 1.0; // R
+        colorArray[index * 3 + 1] = 1.0; // G
+        colorArray[index * 3 + 2] = 1.0; // B
+        opacityArray[index] = 0.15; // Initial opacity
 
-        this.scene.add(particle);
-        this.particles.push(particle);
+        index++;
       }
     }
+
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    this.instancedMesh.geometry.attributes.instanceColor.needsUpdate = true;
+    this.instancedMesh.geometry.attributes.instanceOpacity.needsUpdate = true;
+
+    this.scene.add(this.instancedMesh);
   },
 
   addEventListeners() {
-    document.addEventListener('mousemove', (e) => {
+    document.addEventListener(
+      'mousemove',
+      (e) => {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
-    });
+      },
+      { passive: true }
+    );
 
-    window.addEventListener('resize', () => {
+    window.addEventListener(
+      'resize',
+      () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      },
+      { passive: true }
+    );
   },
 
   updateParticles() {
     if (!this.isEnabled) return;
 
-    const time = Date.now() * 0.001;
+    const now = Date.now();
+    const time = now * 0.001;
     const driftX = Math.sin(time * 0.25) * 8 * backgroundSettings.driftIntensity;
     const driftY = Math.cos(time * 0.25) * 6 * backgroundSettings.driftIntensity;
     const driftZ = Math.sin(time * 0.2) * 3 * backgroundSettings.driftIntensity;
 
-    this.particles.forEach((particle) => {
-      const currentX = particle.userData.world3D.x + driftX;
-      const currentY = particle.userData.world3D.y + driftY;
-      const currentZ = particle.userData.world3D.z + driftZ;
+    const cursorRadius = backgroundSettings.cursorRadius;
+    const trailDuration = backgroundSettings.trailDuration;
+    const lerpSpeed = 0.02 * backgroundSettings.decaySpeed;
 
-      particle.position.set(currentX, currentY, currentZ);
+    for (let i = 0; i < this.instanceCount; i++) {
+      const data = this.instanceData[i];
+
+      const currentX = data.basePos.x + driftX;
+      const currentY = data.basePos.y + driftY;
+      const currentZ = data.basePos.z + driftZ;
+
+      this.dummy.position.set(currentX, currentY, currentZ);
+      this.dummy.scale.set(1, 1, 1);
+      this.dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(i, this.dummy.matrix);
 
       const vector = new THREE.Vector3(currentX, currentY, currentZ);
       vector.project(this.camera);
-
       const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
       const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
 
-      particle.userData.screenX = screenX;
-      particle.userData.screenY = screenY;
+      let targetOpacity = 0.15 * backgroundSettings.brightness;
+      let targetColor = this.tempColor.setRGB(1, 1, 1);
 
       const distance = Math.sqrt((this.mouseX - screenX) ** 2 + (this.mouseY - screenY) ** 2);
-      const cursorRadius = backgroundSettings.cursorRadius;
-
       if (distance <= cursorRadius) {
         const intensity = 1 - distance / cursorRadius;
-        particle.userData.targetOpacity =
-          particle.userData.originalOpacity * backgroundSettings.brightness +
-          intensity * 1.2 * backgroundSettings.glowIntensity;
-        particle.userData.targetColor = new THREE.Color(1, 0.42, 0.42);
-        particle.userData.lastGlowTime = Date.now();
+        targetOpacity += intensity * 1.2 * backgroundSettings.glowIntensity;
+        targetColor = this.tempColor.setRGB(1, 0.42, 0.42);
+        data.lastGlowTime = now;
       } else {
-        const timeSinceGlow = Date.now() - (particle.userData.lastGlowTime || 0);
-        const trailDuration = backgroundSettings.trailDuration;
-
+        const timeSinceGlow = now - (data.lastGlowTime || 0);
         if (timeSinceGlow < trailDuration) {
-          const fadeProgress = timeSinceGlow / trailDuration;
-          const trailIntensity = 1 - fadeProgress;
-          particle.userData.targetOpacity =
-            particle.userData.originalOpacity * backgroundSettings.brightness +
-            trailIntensity * 0.8 * backgroundSettings.glowIntensity;
-        } else {
-          particle.userData.targetOpacity =
-            particle.userData.originalOpacity * backgroundSettings.brightness;
-          particle.userData.targetColor = new THREE.Color(1, 1, 1);
+          const trailIntensity = 1 - timeSinceGlow / trailDuration;
+          targetOpacity += trailIntensity * 0.8 * backgroundSettings.glowIntensity;
         }
       }
 
-      const lerpSpeed = 0.02 * backgroundSettings.decaySpeed;
-      particle.material.opacity = THREE.MathUtils.lerp(
-        particle.material.opacity,
-        particle.userData.targetOpacity,
-        lerpSpeed
-      );
-      particle.material.color.lerp(particle.userData.targetColor, lerpSpeed);
-    });
+      // Lerp opacity and color
+      data.opacity = THREE.MathUtils.lerp(data.opacity, targetOpacity, lerpSpeed);
+      data.color.lerp(targetColor, lerpSpeed);
+
+      // Update the instanceColor and instanceOpacity attributes manually
+      const colorArray = this.instancedMesh.geometry.attributes.instanceColor.array;
+      const opacityArray = this.instancedMesh.geometry.attributes.instanceOpacity.array;
+      colorArray[i * 3] = data.color.r; // R
+      colorArray[i * 3 + 1] = data.color.g; // G
+      colorArray[i * 3 + 2] = data.color.b; // B
+      opacityArray[i] = data.opacity; // Opacity
+    }
+
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    this.instancedMesh.geometry.attributes.instanceColor.needsUpdate = true;
+    this.instancedMesh.geometry.attributes.instanceOpacity.needsUpdate = true;
   },
 
   startRenderLoop() {
@@ -1544,44 +1632,320 @@ const backgroundSystem = {
         requestAnimationFrame(animate);
       }
     };
-    // Only start if not already running
     if (!this.renderLoopStarted) {
       this.renderLoopStarted = true;
-      requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
     }
   },
 
-  updateParticleSizes() {
-    const baseSize = 1 * backgroundSettings.dotSize;
-    this.particles.forEach((particle) => {
-      // Create new geometry with updated size
-      const newGeometry = new THREE.CircleGeometry(baseSize, 8);
-      particle.geometry.dispose();
-      particle.geometry = newGeometry;
-      particle.userData.originalSize = baseSize;
-    });
+  disable() {
+    this.isEnabled = false;
+    this.renderLoopStarted = false;
   },
 };
 
+// Toast notification system
+function showToast(message, type = 'info', duration = 5000) {
+  const toastContainer = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span class="toast-text">${message}</span>`;
+
+  toastContainer.appendChild(toast);
+
+  // Trigger animation
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 10);
+
+  // Auto remove after duration
+  setTimeout(() => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, duration);
+
+  // Click to dismiss
+  toast.addEventListener('click', () => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  });
+
+  return toast;
+}
+
+// Function to update toast content and arrow position
+function updateToastContent(toast, newMessage, arrowX = null) {
+  if (toast) {
+    const textSpan = toast.querySelector('.toast-text');
+    if (textSpan) {
+      textSpan.textContent = newMessage;
+    }
+
+    if (arrowX !== null) {
+      // Update arrow position within the toast
+      toast.style.setProperty('--arrow-x', arrowX + '%');
+    }
+  }
+}
+
+// Function to update sequence content with smooth transitions
+function updateSequenceContent(toast, newMessage, arrowX = null) {
+  if (toast) {
+    // Smooth content transition
+    toast.style.opacity = '0.7';
+    setTimeout(() => {
+      const textSpan = toast.querySelector('.toast-text');
+      if (textSpan) {
+        textSpan.textContent = newMessage;
+      }
+      toast.style.opacity = '1';
+    }, 150);
+
+    if (arrowX !== null) {
+      // Smooth arrow position transition
+      toast.style.setProperty('--arrow-x', arrowX + '%');
+    }
+  }
+}
+
+// Function to create a sequence toast with fixed dimensions
+function showSequenceToast(
+  message,
+  type = 'info',
+  duration = 5000,
+  targetElement = null,
+  position = 'default',
+  offset = null,
+  arrowSide = null,
+  containerWidth = 300,
+  containerHeight = 80,
+  fontSize = null,
+  fontSpacing = null
+) {
+  // For sequence toasts, append directly to body to avoid container positioning issues
+  const toast = document.createElement('div');
+
+  toast.className = `toast ${type} sequence-toast`;
+  toast.innerHTML = `<span class="toast-text">${message}</span>`;
+
+  // Apply custom font size if provided
+  if (fontSize) {
+    toast.style.fontSize = fontSize;
+  }
+
+  // Apply custom letter spacing if provided
+  if (fontSpacing) {
+    toast.style.letterSpacing = fontSpacing;
+  }
+
+  // Set fixed dimensions
+  toast.style.width = containerWidth + 'px';
+  toast.style.height = containerHeight + 'px';
+  toast.style.display = 'flex';
+  toast.style.alignItems = 'center';
+  toast.style.justifyContent = 'center';
+
+  // Check if there are any existing toasts in the DOM for animation
+  const existingToasts = document.querySelectorAll('.toast');
+  const hasExistingToasts = existingToasts.length > 0;
+
+  // Position the toast
+  if (targetElement) {
+    const target = document.querySelector(targetElement);
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      let left, top;
+
+      switch (position) {
+        case 'left':
+          left = rect.left - containerWidth - 50;
+          top = rect.top + rect.height / 2 - containerHeight / 2;
+          const arrowDirection = arrowSide !== null ? arrowSide : 'right';
+          toast.setAttribute('data-arrow', arrowDirection);
+          break;
+        case 'right':
+          left = rect.right + 50;
+          top = rect.top + rect.height / 2 - containerHeight / 2;
+          const arrowDirection2 = arrowSide !== null ? arrowSide : 'left';
+          toast.setAttribute('data-arrow', arrowDirection2);
+          break;
+        case 'top':
+          left = rect.left + rect.width / 2 - containerWidth / 2;
+          top = rect.top - containerHeight - 30;
+          const arrowDirection3 = arrowSide !== null ? arrowSide : 'down';
+          toast.setAttribute('data-arrow', arrowDirection3);
+          break;
+        case 'bottom':
+          left = rect.left + rect.width / 2 - containerWidth / 2;
+          top = rect.bottom + 30;
+          const arrowDirection4 = arrowSide !== null ? arrowSide : 'up';
+          toast.setAttribute('data-arrow', arrowDirection4);
+          break;
+        default:
+          left = rect.left + rect.width / 2 - containerWidth / 2;
+          top = rect.top + rect.height / 2 - containerHeight / 2;
+      }
+
+      // Apply custom offset if provided
+      if (offset) {
+        left += offset.x || 0;
+        top += offset.y || 0;
+      }
+
+      // Ensure toast stays within viewport
+      left = Math.max(20, Math.min(left, window.innerWidth - containerWidth - 20));
+      top = Math.max(20, Math.min(top, window.innerHeight - containerHeight - 20));
+
+      toast.style.position = 'fixed';
+      toast.style.left = left + 'px';
+      toast.style.top = top + 'px';
+      toast.style.zIndex = '1001';
+    }
+  }
+
+  // Add animation class based on whether there are existing toasts
+  if (hasExistingToasts) {
+    toast.classList.add('fade-animation');
+  } else {
+    toast.classList.add('slide-animation');
+  }
+
+  // Add to body instead of toast container
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 10);
+
+  // Auto remove after duration (for sequence toasts, this will be overridden)
+  setTimeout(() => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, duration);
+
+  // Click to dismiss
+  toast.addEventListener('click', () => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  });
+
+  return toast;
+}
+
 // Initialize app
 window.addEventListener('DOMContentLoaded', () => {
+  // Check for token in cookie
   token = utils.getTokenFromCookie('access_token');
+
+  // If no token, just proceed - the server will handle it
   if (!token) {
-    window.location.href = '/login';
-    return;
+    console.log('No token found, proceeding anyway - server will handle authentication');
   }
 
-  const payload = utils.parseJwt(token);
-  if (!payload?.sub) {
-    console.error('Invalid token');
-    window.location.href = '/login';
-    return;
+  initializeApp();
+
+  // Show tutorial sequence on page load
+  setTimeout(() => {
+    startTutorialSequence();
+  }, 1000);
+});
+
+function initializeApp() {
+  // If no token, use a default guest username
+  if (!token) {
+    currentUsername = 'guest_' + Math.random().toString(36).substr(2, 8);
+    console.log('Using default guest username:', currentUsername);
+  } else {
+    const payload = utils.parseJwt(token);
+    if (!payload?.sub) {
+      console.error('Invalid token, using default guest username');
+      currentUsername = 'guest_' + Math.random().toString(36).substr(2, 8);
+    } else {
+      currentUsername = payload.sub;
+    }
   }
 
-  currentUsername = payload.sub;
-
+  // Display name logic
+  window.displayName = localStorage.getItem('displayName') || currentUsername;
   const userDisplay = document.getElementById('current-user');
-  if (userDisplay) userDisplay.textContent = currentUsername;
+  const editBtn = document.getElementById('edit-username-btn');
+  const input = document.getElementById('edit-username-input');
+  const saveBtn = document.getElementById('save-username-btn');
+  const cancelBtn = document.getElementById('cancel-username-btn');
+
+  function updateDisplayName(name) {
+    window.displayName = name;
+    userDisplay.textContent = displayName;
+    localStorage.setItem('displayName', displayName);
+
+    // Broadcast display name change to other users
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type: 'display_name_change',
+          data: {
+            displayName: name,
+            username: currentUsername,
+          },
+        })
+      );
+    }
+  }
+
+  updateDisplayName(displayName);
+
+  editBtn.addEventListener('click', () => {
+    input.value = displayName;
+    input.style.display = 'inline-block';
+    saveBtn.style.display = 'inline-block';
+    cancelBtn.style.display = 'inline-block';
+    editBtn.style.display = 'none';
+    userDisplay.style.display = 'none';
+    input.focus();
+  });
+
+  saveBtn.addEventListener('click', () => {
+    const newName = input.value.trim().slice(0, 24);
+    if (newName) {
+      updateDisplayName(newName);
+    }
+    input.style.display = 'none';
+    saveBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    editBtn.style.display = 'inline-block';
+    userDisplay.style.display = 'inline-block';
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    input.style.display = 'none';
+    saveBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    editBtn.style.display = 'inline-block';
+    userDisplay.style.display = 'inline-block';
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBtn.click();
+    if (e.key === 'Escape') cancelBtn.click();
+  });
 
   // Track user interactions for iOS audio compatibility
   const markUserInteraction = () => {
@@ -1612,7 +1976,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Event listeners
   elements.logoutBtn?.addEventListener('click', () => {
     document.cookie = 'access_token=; Max-Age=0';
-    window.location.href = '/login';
+    window.location.href = '/';
   });
 
   elements.privateSendBtn.addEventListener('click', sendPrivateMessage);
@@ -1621,8 +1985,8 @@ window.addEventListener('DOMContentLoaded', () => {
   elements.privateChatMaximize.addEventListener('click', maximizePrivateChat);
   elements.privateInput.addEventListener('keypress', handlePrivateInputKeyPress);
   elements.usersToggle?.addEventListener('click', toggleUsersPanel);
+  elements.infoToggle?.addEventListener('click', toggleInfoPanel);
 
-  setupWelcomeModalHandlers();
   setupHelpModalHandlers();
 
   elements.usersPanel.classList.add('hidden');
@@ -1630,6 +1994,12 @@ window.addEventListener('DOMContentLoaded', () => {
   elements.usersToggle.classList.add('panel-hidden');
   elements.usersToggle.textContent = '👥';
   elements.usersToggle.title = 'Show Users Panel';
+
+  // Initialize info panel
+  elements.infoPanel.classList.add('hidden');
+  elements.infoToggle.classList.add('panel-hidden');
+  elements.infoToggle.textContent = '▶';
+  elements.infoToggle.title = 'Show Info Panel';
 
   // Only generate RSA key pair if Web Crypto API is available (HTTPS or localhost)
   if (utils.isCryptoAvailable()) {
@@ -1649,7 +2019,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     elements.usersPanel?.classList.remove('panel-loading');
   }, 100);
-});
+}
 
 // Chat form submission
 elements.form.addEventListener('submit', (e) => {
@@ -1672,7 +2042,10 @@ elements.form.addEventListener('submit', (e) => {
     socket.send(
       JSON.stringify({
         type: 'chat_message',
-        data: { message },
+        data: {
+          message,
+          displayName: window.displayName || currentUsername,
+        },
       })
     );
     elements.input.value = '';
@@ -1758,17 +2131,29 @@ if (elements.volumeSlider) {
   });
 
   // Touch event handlers for better mobile control
-  elements.volumeSlider.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
-  });
+  elements.volumeSlider.addEventListener(
+    'touchstart',
+    (e) => {
+      e.stopPropagation();
+    },
+    { passive: true }
+  );
 
-  elements.volumeSlider.addEventListener('touchmove', (e) => {
-    e.stopPropagation();
-  });
+  elements.volumeSlider.addEventListener(
+    'touchmove',
+    (e) => {
+      e.stopPropagation();
+    },
+    { passive: true }
+  );
 
-  elements.volumeSlider.addEventListener('touchend', (e) => {
-    e.stopPropagation();
-  });
+  elements.volumeSlider.addEventListener(
+    'touchend',
+    (e) => {
+      e.stopPropagation();
+    },
+    { passive: true }
+  );
 } else {
   console.error('🔊 Volume slider element not found!');
 }
@@ -1781,28 +2166,32 @@ if (elements.speedToggle) {
   }
 
   // Mouse wheel event handler
-  elements.speedToggle.addEventListener('wheel', (e) => {
-    e.preventDefault();
+  elements.speedToggle.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
 
-    // Determine scroll direction and adjust speed
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newSpeed = Math.max(0.5, Math.min(2.0, audioPlaybackRate + delta));
+      // Determine scroll direction and adjust speed
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      const newSpeed = Math.max(0.5, Math.min(2.0, audioPlaybackRate + delta));
 
-    // Only update if speed actually changed
-    if (newSpeed !== audioPlaybackRate) {
-      audioPlaybackRate = newSpeed;
+      // Only update if speed actually changed
+      if (newSpeed !== audioPlaybackRate) {
+        audioPlaybackRate = newSpeed;
 
-      // Update speed display
-      if (elements.speedDisplay) {
-        elements.speedDisplay.textContent = audioPlaybackRate.toFixed(1) + 'x';
+        // Update speed display
+        if (elements.speedDisplay) {
+          elements.speedDisplay.textContent = audioPlaybackRate.toFixed(1) + 'x';
+        }
+
+        // Apply speed change to currently playing audio
+        if (currentAudio) {
+          currentAudio.playbackRate = audioPlaybackRate;
+        }
       }
-
-      // Apply speed change to currently playing audio
-      if (currentAudio) {
-        currentAudio.playbackRate = audioPlaybackRate;
-      }
-    }
-  });
+    },
+    { passive: false }
+  );
 
   // Prevent default click behavior
   elements.speedToggle.addEventListener('click', (e) => {
@@ -1857,12 +2246,16 @@ if (elements.speedToggle) {
     elements.speedToggle.classList.remove('touch-active');
   });
 
-  elements.speedToggle.addEventListener('touchcancel', (e) => {
-    e.preventDefault();
+  elements.speedToggle.addEventListener(
+    'touchcancel',
+    (e) => {
+      e.preventDefault();
 
-    // Remove visual feedback if touch is cancelled
-    elements.speedToggle.classList.remove('touch-active');
-  });
+      // Remove visual feedback if touch is cancelled
+      elements.speedToggle.classList.remove('touch-active');
+    },
+    { passive: false }
+  );
 } else {
   console.error('⚡ Speed control element not found!');
 }
@@ -2252,4 +2645,582 @@ function clearUnreadStatus(user) {
 
   // Reset unread count
   unreadCounts.set(user, 0);
+}
+
+// Tutorial sequence function with positioning
+function startTutorialSequence() {
+  const tutorialSteps = [
+    {
+      message: ' Click here to see online users and start private chats',
+      type: 'info',
+      duration: 2100,
+      target: '#users-toggle', // Back to targeting the toggle button
+      position: 'left',
+      offset: { x: 30, y: 0 }, // Custom offset
+      arrowSide: 'right', // Force arrow on right side
+      fontSize: '14px', // Custom font size
+      skip: false, // Set to true to skip this step
+    },
+    {
+      message: "💡 Click here for quick questions about Ryan's experience",
+      type: 'info',
+      duration: 2100,
+      target: '#info-toggle', // Back to targeting the toggle button
+      position: 'right',
+      offset: { x: -30, y: 0 }, // Custom offset
+      arrowSide: 'left', // Force arrow on left side
+      fontSize: '16px', // Custom font size
+      skip: false, // Set to true to skip this step
+    },
+    {
+      message: 'Toggle this to chat with the AI assistant about projects',
+      type: 'success',
+      duration: 2100,
+      target: '.bot-robot-button', // Points to bot toggle button
+      position: 'top',
+      arrowSide: 'up', // Force arrow on down side
+      offset: { x: 0, y: -50 },
+      fontSize: '18px', // Custom font size
+      skip: false, // Set to true to skip this step
+    },
+    {
+      message: 'Audio Controls',
+      type: 'info',
+      duration: 8000,
+      target: '#audio-toggle', // Points to audio controls
+      position: 'bottom',
+      arrowSide: 'down', // ← THIS IS THE MISSING LINE
+      fontSize: '16px',
+      skip: true,
+      offset: { x: 100, y: 0 },
+      sequence: {
+        containerWidth: 400,
+        containerHeight: 80,
+        steps: [
+          {
+            message: '🔊 Click to enable/disable audio responses',
+            duration: 2100,
+            arrowX: 25, // Arrow position within toast (percentage from left)
+            arrowSide: 'down', // Force arrow on down side
+            target: '#audio-toggle', // Points to audio controls
+            skip: false,
+
+          },
+          {
+            message: '🎚️ Hover + scroll to adjust volume',
+            duration: 2000,
+            arrowX: 25, // Arrow position within toast (percentage from left)
+            arrowSide: 'down', // Force arrow on down side
+            target: '#audio-toggle', // Points to audio controls
+            skip: false,
+          },
+          {
+            message: '⚡ Scroll to change playback speed',
+            duration: 2000,
+            arrowX: 38, // Arrow position within toast
+          },
+          {
+            message: 'General info about this app',
+            duration: 2000,
+            arrowX: 50, // Arrow position within toast
+            skip: false,
+          },
+        ],
+      },
+    },
+
+
+
+    {
+      message: 'Set custome username if desired',
+      target: '.username-display', // <-- class selector
+      position: 'top',
+      top: 70,
+      skip: false,
+      arrowX: 60, // Arrow positi on within toast
+      type: 'info',
+      duration: 2000,
+      fontSize: '16px', // Custom font size for sequence toast
+    },
+
+    {
+      message: '🔊 Settings Controls',
+      type: 'info',
+      duration: 5000,
+      target: '#logout-btn', // Points to audio controls
+      position: 'bottom',
+      arrowSide: 'down', // ← THIS IS THE MISSING LINE
+
+      fontSize: '16px',
+      skip: false,
+      offset: { x: 100, y: 0 },
+      sequence: {
+        containerWidth: 400,
+        containerHeight: 80,
+        steps: [
+          {
+            message: 'Background Settings',
+            duration: 2000,
+            arrowX: 77, // Arrow position within toast (percentage from left)
+            arrowSide: 'down', // Force arrow on down side
+            target: '#logout-btn', // Points to audio controls
+          },
+          {
+            message: 'Logout, remove JWT from local storage',
+            duration: 2000,
+            arrowX: 90, // Arrow position within toast (percentage from left)
+            arrowSide: 'down', // Force arrow on down side
+            target: '#logout-btn', // Points to audio controls
+          },
+        ],
+      },
+    },
+  ]
+
+
+
+    // {
+    //   message: 'desired',
+    //   target: '#logout-btn', // <-- class selector
+    //   position: 'top',
+    //   top: 810,
+    //   skip: false,
+    //   arrowX: 68, // Arrow positi on within toast
+    //   type: 'info',
+    //   duration: 1000,
+    //   fontSize: '16px', // Custom font size for sequence toast
+    //   arrowSide: 'down', // ← ADD THIS ONE LINE
+    //   sequence: {
+    //     containerWidth: 300,
+    //     containerHeight: 80,
+    //     steps: [
+    //       {
+    //         message: 'Click to log out',
+    //         duration: 111000,
+    //         arrowX: 50,
+    //         arrowSide: 'down',
+    //         target: '#logout-btn',
+    //         containerWidth: 300, // 👈 Needed for center alignment
+    //         containerHeight: 80, // 👈 Needed for top/bottom math
+    //         offset: { x: 100, y: 0 },
+
+    //       },
+    //     ],
+    //   },
+    // },
+  
+  let currentStep = 0;
+  let currentNestedStep = 0;
+  let currentToast = null;
+
+  function showNextStep() {
+    // Skip steps that have skip: true
+    while (currentStep < tutorialSteps.length && tutorialSteps[currentStep].skip) {
+      currentStep++;
+    }
+
+    if (currentStep < tutorialSteps.length) {
+      const step = tutorialSteps[currentStep];
+
+      if (step.sequence) {
+        // Handle sequence type - maintains same container
+        if (currentNestedStep === 0) {
+          // Show initial toast with fixed dimensions
+          console.log(
+            'Creating sequence toast - Target:',
+            step.target,
+            'Position:',
+            step.position,
+            'ArrowSide:',
+            step.arrowSide
+          );
+          console.log('About to create sequence toast with step:', step);
+          currentToast = showSequenceToast(
+            step.message,
+            step.type,
+            step.duration,
+            step.target,
+            step.position,
+            step.offset,
+            step.arrowSide,
+            step.sequence.containerWidth,
+            step.sequence.containerHeight,
+            step.fontSize,
+            step.fontSpacing
+          );
+          console.log('Sequence toast created:', currentToast);
+        }
+
+        if (currentNestedStep < step.sequence.steps.length) {
+          // Update toast content and arrow position
+          const sequenceStep = step.sequence.steps[currentNestedStep];
+          console.log('Processing sequence step:', currentNestedStep, 'with data:', sequenceStep);
+
+          // Always recalculate position to ensure offset is applied
+          const target = document.querySelector(step.target);
+          if (target) {
+            const rect = target.getBoundingClientRect();
+            let left, top;
+
+            // Recalculate position based on current step position
+            switch (step.position) {
+              case 'bottom':
+                left =
+                  rect.left +
+                  rect.width / 2 -
+                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
+                top = rect.bottom + 30;
+                break;
+              case 'top':
+                left =
+                  rect.left +
+                  rect.width / 2 -
+                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
+                top =
+                  rect.top - (sequenceStep.containerHeight || step.sequence.containerHeight) - 30;
+                break;
+              case 'left':
+                left =
+                  rect.left - (sequenceStep.containerWidth || step.sequence.containerWidth) - 50;
+                top =
+                  rect.top +
+                  rect.height / 2 -
+                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
+                break;
+              case 'right':
+                left = rect.right + 50;
+                top =
+                  rect.top +
+                  rect.height / 2 -
+                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
+                break;
+              default:
+                left =
+                  rect.left +
+                  rect.width / 2 -
+                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
+                top =
+                  rect.top +
+                  rect.height / 2 -
+                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
+            }
+
+            // Apply custom offset if provided
+            if (step.offset) {
+              left += step.offset.x || 0;
+              top += step.offset.y || 0;
+            }
+
+            // Apply custom top/bottom from sequence step if provided (only if it's a positive value)
+            if (
+              sequenceStep.top !== null &&
+              sequenceStep.top !== undefined &&
+              sequenceStep.top >= 0
+            ) {
+              console.log('Sequence step using custom top:', sequenceStep.top);
+              top = sequenceStep.top;
+            } else if (
+              sequenceStep.bottom !== null &&
+              sequenceStep.bottom !== undefined &&
+              sequenceStep.bottom >= 0
+            ) {
+              console.log('Sequence step using custom bottom:', sequenceStep.bottom);
+              // For bottom positioning, we need to calculate from viewport height
+              top =
+                window.innerHeight -
+                (sequenceStep.bottom +
+                  (sequenceStep.containerHeight || step.sequence.containerHeight));
+            }
+
+            console.log('left:', left, 'top:', top);
+
+            // Ensure toast stays within viewport
+            const containerWidth = sequenceStep.containerWidth || step.sequence.containerWidth;
+            const containerHeight = sequenceStep.containerHeight || step.sequence.containerHeight;
+            left = Math.max(20, Math.min(left, window.innerWidth - containerWidth - 20));
+            top = Math.max(20, Math.min(top, window.innerHeight - containerHeight - 20));
+
+            // Update dimensions and position
+            if (sequenceStep.containerWidth) {
+              currentToast.style.width = sequenceStep.containerWidth + 'px';
+            }
+            if (sequenceStep.containerHeight) {
+              currentToast.style.height = sequenceStep.containerHeight + 'px';
+            }
+
+            currentToast.style.left = left + 'px';
+            currentToast.style.top = top + 'px';
+          }
+
+          updateSequenceContent(currentToast, sequenceStep.message, sequenceStep.arrowX);
+          currentNestedStep++;
+
+          // Schedule next sequence step
+          setTimeout(showNextStep, sequenceStep.duration);
+        } else {
+          // Move to next main step
+          currentNestedStep = 0;
+          // Remove the sequence toast
+          if (currentToast && currentToast.parentNode) {
+            currentToast.classList.add('hide');
+            setTimeout(() => {
+              if (currentToast && currentToast.parentNode) {
+                currentToast.parentNode.removeChild(currentToast);
+              }
+            }, 300);
+          }
+          currentToast = null;
+          currentStep++;
+          setTimeout(showNextStep, 500);
+        }
+      } else {
+        // Regular single toast
+        console.log(
+          'Tutorial step:',
+          currentStep,
+          'Target:',
+          step.target,
+          'Position:',
+          step.position,
+          'ArrowSide:',
+          step.arrowSide
+        );
+        console.log('Tutorial step config:', {
+          message: step.message,
+          top: step.top,
+          bottom: step.bottom,
+          offset: step.offset,
+        });
+        showPositionedToast(
+          step.message,
+          step.type,
+          step.duration,
+          step.target,
+          step.position,
+          step.offset,
+          step.arrowSide,
+          step.fontSize,
+          step.fontSpacing,
+          step.top,
+          step.bottom,
+          step.arrowX
+        );
+        currentStep++;
+        setTimeout(showNextStep, step.duration + 500);
+      }
+    }
+  }
+
+  // Start the sequence
+  showNextStep();
+}
+
+// Enhanced toast function with positioning
+function showPositionedToast(
+  message,
+  type = 'info',
+  duration = 5000,
+  targetElement = null,
+  position = 'default',
+  offset = null,
+  arrowSide = null,
+  fontSize = null,
+  fontSpacing = null,
+  customTop = null,
+  customBottom = null,
+  arrowX = null
+) {
+  console.log('showPositionedToast called with:', {
+    message,
+    targetElement,
+    position,
+    customTop,
+    customBottom,
+    offset,
+  });
+  const toastContainer = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span class="toast-text">${message}</span>`;
+
+  // Set explicit width for toasts appended to body
+  toast.style.width = '300px';
+  toast.style.maxWidth = '300px';
+
+  // Apply custom font size if provided
+  if (fontSize) {
+    toast.style.fontSize = fontSize;
+  }
+
+  // Apply custom letter spacing if provided
+  if (fontSpacing) {
+    toast.style.letterSpacing = fontSpacing;
+  }
+
+  // Check if there are any existing toasts
+  const existingToasts = toastContainer.querySelectorAll('.toast');
+  const hasExistingToasts = existingToasts.length > 0;
+  console.log('hasExistingToasts:', hasExistingToasts);
+  console.log('targetElement:', targetElement);
+
+  // Position the toast
+  if (targetElement) {
+    const target = document.querySelector(targetElement);
+    console.log('Target query result:', target);
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      let left, top;
+
+      switch (position) {
+        case 'left':
+          left = rect.left - 500; // Much larger distance for toggle buttons
+          top = rect.top + rect.height / 2 - 25;
+          const arrowDirection = arrowSide !== null ? arrowSide : 'right';
+          toast.setAttribute('data-arrow', arrowDirection);
+          console.log('Setting arrow direction:', arrowDirection, 'for position:', position);
+          break;
+        case 'right':
+          left = rect.right + 80; // Much larger distance for toggle buttons
+          top = rect.top + rect.height / 2 - 25;
+          const arrowDirection2 = arrowSide !== null ? arrowSide : 'left';
+          toast.setAttribute('data-arrow', arrowDirection2);
+          console.log('Setting arrow direction:', arrowDirection2, 'for position:', position);
+          break;
+        case 'top':
+          console.log('TOP CASE: Entering top position case');
+          left = rect.left + rect.width / 2 - 150;
+          top = rect.top - 80;
+          const arrowDirection3 = arrowSide !== null ? arrowSide : 'down';
+          toast.setAttribute('data-arrow', arrowDirection3);
+          console.log('Setting arrow direction:', arrowDirection3, 'for position:', position);
+          break;
+        case 'bottom':
+          left = rect.left + rect.width / 2 - 150;
+          top = rect.bottom + 20;
+          const arrowDirection4 = arrowSide !== null ? arrowSide : 'up';
+          toast.setAttribute('data-arrow', arrowDirection4);
+          console.log('Setting arrow direction:', arrowDirection4, 'for position:', position);
+          break;
+        default:
+          left = rect.left + rect.width / 2 - 150;
+          top = rect.top + rect.height / 2 - 25;
+        // No arrow for center positioning
+      }
+
+      // Ensure toast stays within viewport
+      left = Math.max(20, Math.min(left, window.innerWidth - 320));
+      top = Math.max(20, Math.min(top, window.innerHeight - 80));
+
+      // Apply custom offset if provided (after viewport constraints)
+      if (offset) {
+        left += offset.x || 0;
+        top += offset.y || 0;
+      }
+
+      toast.style.position = 'fixed';
+      toast.style.left = left + 'px';
+
+      // Always use customTop/customBottom if provided, regardless of target
+      if (customTop !== null && customTop !== undefined) {
+        console.log('FINAL: Setting direct top position:', customTop + 'px');
+        toast.style.top = customTop + 'px';
+        toast.style.bottom = '';
+      } else if (customBottom !== null && customBottom !== undefined) {
+        console.log('FINAL: Setting direct bottom position:', customBottom + 'px');
+        toast.style.bottom = customBottom + 'px';
+        toast.style.top = '';
+      } else {
+        console.log('FINAL: Using calculated top position:', top + 'px');
+        toast.style.top = top + 'px';
+      }
+
+      // Set arrow position if provided
+      if (arrowX !== null && arrowX !== undefined) {
+        toast.style.setProperty('--arrow-x', arrowX + '%');
+      }
+
+      toast.style.zIndex = '1001';
+    }
+  } else if (position === 'center') {
+    toast.style.position = 'fixed';
+    toast.style.left = '50%';
+    toast.style.top = '50%';
+    toast.style.transform = 'translate(-50%, -50%)';
+    toast.style.zIndex = '1001';
+    // No arrow for center positioning
+  } else if (position === 'top') {
+    console.log('Using screen edge positioning for top');
+    toast.style.position = 'fixed';
+    toast.style.left = '50%';
+    toast.style.top = '20px';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.zIndex = '1001';
+    // No arrow for screen edge positioning
+  } else if (position === 'bottom') {
+    toast.style.position = 'fixed';
+    toast.style.left = '50%';
+    toast.style.bottom = '20px';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.zIndex = '1001';
+    // No arrow for screen edge positioning
+  } else if (position === 'left') {
+    toast.style.position = 'fixed';
+    toast.style.left = '20px';
+    toast.style.top = '50%';
+    toast.style.transform = 'translateY(-50%)';
+    toast.style.zIndex = '1001';
+    // No arrow for screen edge positioning
+  } else if (position === 'right') {
+    toast.style.position = 'fixed';
+    toast.style.right = '20px';
+    toast.style.top = '50%';
+    toast.style.transform = 'translateY(-50%)';
+    toast.style.zIndex = '1001';
+    // No arrow for screen edge positioning
+  } else {
+    // Default: top right corner
+    toast.style.position = 'fixed';
+    toast.style.right = '20px';
+    toast.style.top = '20px';
+    toast.style.zIndex = '1001';
+    // No arrow for default positioning
+  }
+
+  // Add animation class based on whether there are existing toasts
+  if (hasExistingToasts) {
+    toast.classList.add('fade-animation');
+  } else {
+    toast.classList.add('slide-animation');
+  }
+
+  // Add to body instead of toast container to avoid container positioning issues
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 10);
+
+  // Auto remove after duration (for sequence toasts, this will be overridden)
+  setTimeout(() => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, duration);
+
+  // Click to dismiss
+  toast.addEventListener('click', () => {
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  });
+
+  return toast;
 }

@@ -18,34 +18,34 @@ from server.db.dbmodels import ChatHistory
 WEBSOCKET_CONFIG = {
     # Local development
     "LOCAL_WS_URL": "ws://localhost:8080/ws",
-    
+
     # Production
     "PRODUCTION_WS_URL": "wss://chat.socksthoughtshop.lol/ws",
-    
+
     # Current active URL (should match frontend)
-    "ACTIVE_WS_URL": "wss://chat.socksthoughtshop.lol/ws"
+    "ACTIVE_WS_URL": "ws://localhost:8080/ws"
+    # "ACTIVE_WS_URL": "wss://chat.socksthoughtshop.lol/ws"
 }
 
 # Ollama Configuration - Customize your AI model settings here
 OLLAMA_CONFIG = {
     # Ollama API URL
     "API_URL": "http://localhost:11434/api/generate",
-    
+
     # Model name (options: mistral, tinyllama, llama2, llama3.2, codellama, deepseek-r1:latest, etc.)
     "MODEL": "llama3.2",
-    
+
     # Request timeout in seconds
     "TIMEOUT": 300,
-    
+
     # Stream responses for real-time typing effect
     "STREAM": True
 }
 
 
-
 PROMPT_CONFIG = {
     "CURRENT_STYLE": "default",
-    
+
     "STYLES": {
         "default": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience.
 
@@ -73,48 +73,48 @@ Use ONLY the facts provided in the context below. Do not make up information.
 # ===================================
 
 
-
 class PortfolioAssistant:
     """
     Optimized portfolio assistant with caching, persistence, and lazy loading.
     """
-    
+
     # Class-level model cache for sharing across instances
     _model_cache = None
     _chroma_client = None
-    
+
     def __init__(self, projects_file: str = "server/chat/projects.json"):
         """Initialize the portfolio assistant with optimized loading."""
         self.projects_file = projects_file
         self.model = None
         self.collection = None
         self.projects = []
-        
+
         # Create cache directories
         self.cache_dir = Path(".portfolio_cache")
         self.cache_dir.mkdir(exist_ok=True)
         self.db_dir = self.cache_dir / "chroma_db"
         # User-specific state management (per-user state)
         self.user_states = {}  # Dict[user_id, user_state]
-        
+
         # Global image data for View Images button (shared across all users)
         self.current_project_images = []
-        
+
         try:
             print("🤖 Initializing Optimized Portfolio Assistant...")
             self._load_projects()
-            
+
             # Only initialize if we have projects
             if self.projects:
                 self._ensure_initialized()
-                print(f"✅ Portfolio Assistant ready with {len(self.projects)} projects")
+                print(
+                    f"✅ Portfolio Assistant ready with {len(self.projects)} projects")
             else:
                 print("⚠️ No projects loaded, using fallback mode")
-                
+
         except Exception as e:
             print(f"❌ Error initializing Portfolio Assistant: {e}")
             print("🔄 Portfolio Assistant will use fallback responses")
-    
+
     def _load_projects(self):
         """Load projects from software and electrical JSON files."""
         def load_file(path: str, default_type: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -129,17 +129,19 @@ class PortfolioAssistant:
                 return data
 
         print("📁 Loading software, electrical, and hobby projects...")
-        software_projects = load_file("server/chat/projects.json", default_type="software")
-        electrical_projects = load_file("server/chat/electrical.json", default_type="electrical")
-        hobby_projects = load_file("server/chat/hobby.json", default_type="hobby")
+        software_projects = load_file(
+            "server/chat/projects.json", default_type="software")
+        electrical_projects = load_file(
+            "server/chat/electrical.json", default_type="electrical")
+        hobby_projects = load_file(
+            "server/chat/hobby.json", default_type="hobby")
 
         self.projects = software_projects + electrical_projects + hobby_projects
         print(f"✅ Loaded {len(self.projects)} total projects")
 
-
-
     def list_hobby_projects(self) -> str:
-        hobbies = [proj for proj in self.projects if proj.get("type") == "hobby"]
+        hobbies = [proj for proj in self.projects if proj.get(
+            "type") == "hobby"]
         if not hobbies:
             return "I couldn't find any hobby projects to show."
 
@@ -151,7 +153,6 @@ class PortfolioAssistant:
             "\n".join([f"{i+1}. {proj['name']}" for i, proj in enumerate(hobbies)]) +
             "\n\nWould you like to hear more about one of them? Just reply with the number or name."
         )
-        
 
     def handle_user_reply(self, message: str) -> Optional[str]:
         if self.user_state.get("awaiting_hobby_choice"):
@@ -166,7 +167,6 @@ class PortfolioAssistant:
             return "Sorry, I didn't recognize that choice. Please pick a number or project name."
 
         return None
-    
 
     def handle_hobby_selection(self, query: str, user_id: str = "default") -> Optional[str]:
         """Process user's selection of a hobby project by number or name."""
@@ -186,14 +186,16 @@ class PortfolioAssistant:
         if selection.isdigit():
             index = int(selection) - 1
             if 0 <= index < len(hobby_projects):
-                user_state["awaiting_hobby_choice"] = False  # Reset only on success
+                # Reset only on success
+                user_state["awaiting_hobby_choice"] = False
                 project = hobby_projects[index]
                 return self._summarize_project(project)
 
         # Try match by name
         for proj in hobby_projects:
             if selection in proj["name"].lower():
-                user_state["awaiting_hobby_choice"] = False  # Reset only on success
+                # Reset only on success
+                user_state["awaiting_hobby_choice"] = False
                 return self._summarize_project(proj)
 
         # Don't reset state on invalid selection, let user try again
@@ -201,90 +203,96 @@ class PortfolioAssistant:
 
     def _summarize_project(self, proj: Dict[str, Any]) -> str:
         lines = [f"**{proj['name']}**", proj['description']]
-        
+
         if proj.get("skills"):
             lines.append(f"\n**Skills:** {', '.join(proj['skills'])}")
 
         if proj.get("code_url"):
             lines.append(f"\n**Code:** {proj['code_url']}")
-        
+
         if proj.get("image"):
             # Process image path same as in _render_hobby_detail
             import os
             image_path = proj['image']
-            
+
             # Determine if we have an absolute or relative path and process accordingly
             if image_path.startswith("C:/Users/rpski/Desktop/chat/server/static/assets/"):
                 # Absolute path - convert to relative
-                relative_path = image_path.replace("C:/Users/rpski/Desktop/chat/server/static/assets/", "")
+                relative_path = image_path.replace(
+                    "C:/Users/rpski/Desktop/chat/server/static/assets/", "")
                 full_path = image_path  # Use the absolute path for file operations
             elif image_path.startswith("/static/assets/"):
                 # Relative path starting with /static/assets/
                 relative_path = image_path.replace("/static/assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             elif image_path.startswith("/assets/"):
                 # Relative path starting with /assets/
                 relative_path = image_path.replace("/assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             elif image_path.startswith("assets/"):
                 # Relative path starting with assets/ (no leading slash)
                 relative_path = image_path.replace("assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             else:
                 # For non-standard paths, skip image
-                print(f"🔍 Skipping non-standard image path in summary: {image_path}")
+                print(
+                    f"🔍 Skipping non-standard image path in summary: {image_path}")
                 return
-            
+
             # Initialize empty list for image files
             image_files_to_show = []
-            
+
             # Check if it's a directory with multiple images
             if os.path.isdir(full_path):
                 # Get all image files from the directory
-                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                
+                image_extensions = {'.jpg', '.jpeg',
+                                    '.png', '.gif', '.webp', '.bmp'}
+
                 try:
                     for filename in os.listdir(full_path):
                         if any(filename.lower().endswith(ext) for ext in image_extensions):
                             relative_file_path = f"{relative_path}/{filename}"
                             image_files_to_show.append(relative_file_path)
-                    
+
                     # Sort for consistent order
                     image_files_to_show.sort()
-                    
+
                 except Exception as e:
                     print(f"❌ Error reading image directory {full_path}: {e}")
                     # Skip image on error
                     image_files_to_show = []
-                    
+
             elif os.path.isfile(full_path):
                 # Single image file
                 filename = os.path.basename(full_path)
                 relative_file_path = f"{relative_path}/{filename}"
                 image_files_to_show = [relative_file_path]
-            
+
             # Only create gallery if we have images
             if image_files_to_show:
-                image_gallery = self._create_image_gallery(image_files_to_show, proj["name"])
+                image_gallery = self._create_image_gallery(
+                    image_files_to_show, proj["name"])
                 if image_gallery:
                     lines.append(f"\n{image_gallery}")
 
         if proj.get("notes"):
-            lines.append("\n**Highlights:**\n" + "\n".join(f"- {n}" for n in proj["notes"]))
+            lines.append("\n**Highlights:**\n" +
+                         "\n".join(f"- {n}" for n in proj["notes"]))
 
         return "\n".join(lines)
-
 
     def render_project_detail(self, project: dict) -> str:
         out = f"**{project['name']}**\n\n{project['description']}\n\n"
         if project.get("notes"):
-            out += "Highlights:\n" + "\n".join(f"- {note}" for note in project["notes"]) + "\n\n"
+            out += "Highlights:\n" + \
+                "\n".join(f"- {note}" for note in project["notes"]) + "\n\n"
         if project.get("image"):
             image_path = f"/static/assets/hobby/{Path(project['image']).name}"
             out += f"![Project Image]({image_path})"
         return out
-
-
 
     def handle_hobby_list(self, user_id: str = "default") -> str:
         """Present hobby list with clickable buttons for each project."""
@@ -321,57 +329,59 @@ class PortfolioAssistant:
         """Handle button clicks for hobby selection and project images."""
         if not query.startswith("[BUTTON_CLICK|"):
             return None
-            
+
         try:
             # Extract button info from: [BUTTON_CLICK|button_id|button_text]
             parts = query.split("|")
-            
+
             if len(parts) >= 2:
                 button_id = parts[1]
-                
+
                 # Handle hobby selection buttons
                 if button_id.startswith("hobby_select_"):
                     index = int(button_id.split("_")[-1])  # Get the index
-                    
+
                     # Get hobby projects directly
-                    hobby_projects = [p for p in self.projects if p.get("type") == "hobby"]
-                    
+                    hobby_projects = [
+                        p for p in self.projects if p.get("type") == "hobby"]
+
                     if 0 <= index < len(hobby_projects):
                         # Clear the awaiting state since user made a selection
                         user_state = self.get_user_state(user_id)
                         user_state["awaiting_hobby_choice"] = False
-                        
+
                         project = hobby_projects[index]
                         return self._summarize_project(project)
-                
+
                 # Handle general project image viewing
                 elif button_id == "view_project_images":
                     # Use global image data instead of per-user data
                     projects_with_images = self.current_project_images
-                    
+
                     if not projects_with_images:
                         return "Sorry, no images are available for the current projects."
-                    
+
                     # Show images for all projects that have them
                     gallery_commands = []
                     for proj_info in projects_with_images:
                         proj_name = proj_info['name']
                         image_path = proj_info['image']
-                        
+
                         # Process the image path and create gallery
-                        gallery_result = self._process_project_image(image_path, proj_name)
+                        gallery_result = self._process_project_image(
+                            image_path, proj_name)
                         if gallery_result:
                             gallery_commands.append(gallery_result)
-                    
+
                     if gallery_commands:
                         # Return just the gallery commands - the issue might be in frontend processing
                         return "\n".join(gallery_commands)
                     else:
                         return "Sorry, I couldn't load the images for these projects."
-                    
+
         except (ValueError, IndexError):
             pass
-            
+
         return "Sorry, I couldn't process that selection."
 
     def _clean_bot_mention(self, message: str) -> str:
@@ -385,72 +395,78 @@ class PortfolioAssistant:
         """Create a gallery command for the frontend to handle"""
         if not images:
             return ""
-        
+
         # Ensure images is a list, not a string (defensive programming)
         if isinstance(images, str):
             # If it's a string, treat it as a single image path
             images = [images]
-        
+
         if len(images) == 1:
             # Single image - send gallery command
             command = f"[GALLERY_SHOW|{images[0]}|{project_name}]"
         else:
             # Multiple images - send gallery command with pipe-separated images
-            images_str = "||".join(images)  # Use || as separator to avoid conflicts
+            # Use || as separator to avoid conflicts
+            images_str = "||".join(images)
             command = f"[GALLERY_SHOW|{images_str}|{project_name}]"
-        
+
         return command
-    
+
     def _process_project_image(self, image_path: str, project_name: str) -> Optional[str]:
         """Process a project's image path and return gallery command."""
         import os
-        
+
         if not image_path or not image_path.strip():
             return None
-        
+
         # Determine if we have an absolute or relative path and process accordingly
         if image_path.startswith("C:/Users/rpski/Desktop/chat/server/static/assets/"):
             # Absolute path - convert to relative
-            relative_path = image_path.replace("C:/Users/rpski/Desktop/chat/server/static/assets/", "")
+            relative_path = image_path.replace(
+                "C:/Users/rpski/Desktop/chat/server/static/assets/", "")
             full_path = image_path  # Use the absolute path for file operations
         elif image_path.startswith("/static/assets/"):
             # Relative path starting with /static/assets/
             relative_path = image_path.replace("/static/assets/", "")
-            full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+            # Convert to absolute for file operations
+            full_path = f"server/static/assets/{relative_path}"
         elif image_path.startswith("/assets/"):
             # Relative path starting with /assets/
             relative_path = image_path.replace("/assets/", "")
-            full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+            # Convert to absolute for file operations
+            full_path = f"server/static/assets/{relative_path}"
         elif image_path.startswith("assets/"):
             # Relative path starting with assets/ (no leading slash)
             relative_path = image_path.replace("assets/", "")
-            full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+            # Convert to absolute for file operations
+            full_path = f"server/static/assets/{relative_path}"
         else:
             # For non-standard paths, skip image
             print(f"🔍 Skipping non-standard image path: {image_path}")
             return None
-        
+
         # Initialize empty list for image files
         image_files_to_show = []
-        
+
         # Check if it's a directory with multiple images
         if os.path.isdir(full_path):
             # Get all image files from the directory
-            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-            
+            image_extensions = {'.jpg', '.jpeg',
+                                '.png', '.gif', '.webp', '.bmp'}
+
             try:
                 for filename in os.listdir(full_path):
                     if any(filename.lower().endswith(ext) for ext in image_extensions):
                         relative_file_path = f"{relative_path}/{filename}"
                         image_files_to_show.append(relative_file_path)
-                
+
                 # Sort for consistent order
                 image_files_to_show.sort()
-                
+
             except Exception as e:
                 print(f"❌ Error reading image directory {full_path}: {e}")
                 return None
-                
+
         elif os.path.isfile(full_path):
             # Single image file
             filename = os.path.basename(full_path)
@@ -459,68 +475,74 @@ class PortfolioAssistant:
         else:
             print(f"📁 Path not found: {full_path}")
             return None
-        
+
         # Only create gallery if we have images
         if image_files_to_show:
             return self._create_image_gallery(image_files_to_show, project_name)
-        
+
         return None
 
     def _render_hobby_detail(self, hobby: Dict[str, Any]) -> str:
         desc = f"**{hobby['name']}**\n\n{hobby['description']}\n\n"
 
         if hobby.get("notes"):
-            desc += "Highlights:\n" + "\n".join(f"- {note}" for note in hobby["notes"]) + "\n\n"
-        
+            desc += "Highlights:\n" + \
+                "\n".join(f"- {note}" for note in hobby["notes"]) + "\n\n"
+
         if hobby.get("image"):
             # Handle image paths (directories or single files)
             import os
             image_path = hobby['image']
-            
+
             # Determine if we have an absolute or relative path and process accordingly
             if image_path.startswith("C:/Users/rpski/Desktop/chat/server/static/assets/"):
                 # Absolute path - convert to relative
-                relative_path = image_path.replace("C:/Users/rpski/Desktop/chat/server/static/assets/", "")
+                relative_path = image_path.replace(
+                    "C:/Users/rpski/Desktop/chat/server/static/assets/", "")
                 full_path = image_path  # Use the absolute path for file operations
             elif image_path.startswith("/static/assets/"):
                 # Relative path starting with /static/assets/
                 relative_path = image_path.replace("/static/assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             elif image_path.startswith("/assets/"):
                 # Relative path starting with /assets/
                 relative_path = image_path.replace("/assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             elif image_path.startswith("assets/"):
                 # Relative path starting with assets/ (no leading slash)
                 relative_path = image_path.replace("assets/", "")
-                full_path = f"server/static/assets/{relative_path}"  # Convert to absolute for file operations
+                # Convert to absolute for file operations
+                full_path = f"server/static/assets/{relative_path}"
             else:
                 # Unsupported path format
                 desc += f"📷 Images: {image_path}"
                 return desc
-            
+
             # Initialize empty list for image files
             image_files_to_show = []
-            
+
             # Check if it's a directory with multiple images
             if os.path.isdir(full_path):
                 # Get all image files from the directory
-                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                
+                image_extensions = {'.jpg', '.jpeg',
+                                    '.png', '.gif', '.webp', '.bmp'}
+
                 try:
                     for filename in os.listdir(full_path):
                         if any(filename.lower().endswith(ext) for ext in image_extensions):
                             relative_file_path = f"{relative_path}/{filename}"
                             image_files_to_show.append(relative_file_path)
-                    
+
                     # Sort for consistent order
                     image_files_to_show.sort()
-                    
+
                 except Exception as e:
                     print(f"❌ Error reading image directory {full_path}: {e}")
                     desc += f"📁 Error reading folder: {relative_path}"
                     return desc
-                    
+
             elif os.path.isfile(full_path):
                 # Single image file
                 filename = os.path.basename(full_path)
@@ -529,16 +551,17 @@ class PortfolioAssistant:
             else:
                 desc += f"📁 Path not found: {relative_path}"
                 return desc
-            
+
             # Only call gallery if we have images
             if image_files_to_show:
-                gallery_result = self._create_image_gallery(image_files_to_show, hobby['name'])
+                gallery_result = self._create_image_gallery(
+                    image_files_to_show, hobby['name'])
                 desc += gallery_result
             else:
                 desc += f"📁 No images found in: {relative_path}"
 
         return desc
-    
+
     def _ensure_initialized(self):
         """Lazy initialization of model and database only when needed."""
         if self.model is None:
@@ -546,42 +569,43 @@ class PortfolioAssistant:
         if self.collection is None:
             self._initialize_chromadb()
             self._populate_database()
-    
+
     def _get_file_hash(self) -> str:
         """Generate hash of all projects files for cache invalidation."""
         try:
             # Include all three JSON files in the hash calculation
             file_paths = [
                 "server/chat/projects.json",
-                "server/chat/electrical.json", 
+                "server/chat/electrical.json",
                 "server/chat/hobby.json"
             ]
-            
+
             combined_content = b""
             for file_path in file_paths:
                 if os.path.exists(file_path):
                     with open(file_path, 'rb') as f:
                         combined_content += f.read()
-            
+
             return hashlib.md5(combined_content).hexdigest()
         except Exception:
             return "no_file"
-    
+
     def _initialize_model(self):
         """Initialize the SentenceTransformer model with caching."""
         if PortfolioAssistant._model_cache is None:
             try:
                 print("🔍 Loading SentenceTransformer model (cached)...")
-                PortfolioAssistant._model_cache = SentenceTransformer("all-MiniLM-L6-v2")
+                PortfolioAssistant._model_cache = SentenceTransformer(
+                    "all-MiniLM-L6-v2")
                 print("✅ Model loaded and cached")
             except Exception as e:
                 print(f"❌ Error loading SentenceTransformer: {e}")
                 raise
         else:
             print("🚀 Using cached SentenceTransformer model")
-        
+
         self.model = PortfolioAssistant._model_cache
-    
+
     def _initialize_chromadb(self):
         """Initialize ChromaDB client with persistence."""
         if PortfolioAssistant._chroma_client is None:
@@ -599,11 +623,11 @@ class PortfolioAssistant:
                     Settings(anonymized_telemetry=False)
                 )
                 print("🔄 Using in-memory ChromaDB fallback")
-        
+
         # Get or create collection with version based on file hash
         file_hash = self._get_file_hash()
         collection_name = f"portfolio_v_{file_hash[:8]}"
-        
+
         try:
             self.collection = PortfolioAssistant._chroma_client.get_or_create_collection(
                 name=collection_name,
@@ -613,20 +637,20 @@ class PortfolioAssistant:
         except Exception as e:
             print(f"❌ Error creating collection: {e}")
             raise
-    
+
     def _populate_database(self):
         """Populate ChromaDB with project embeddings (optimized with caching)."""
         if not self.projects or not self.model or not self.collection:
             return
-        
+
         try:
             # Check if collection already has data
             if self.collection.count() > 0:
                 print("🚀 ChromaDB collection already populated with embeddings")
                 return
-            
+
             print("📊 Generating and caching embeddings...")
-            
+
             # Create corpus texts
             corpus_texts = []
             for proj in self.projects:
@@ -639,10 +663,11 @@ class PortfolioAssistant:
                 if proj.get("image"):
                     text += f"\nImage: {proj['image']}"
                 corpus_texts.append(text.strip())
-            
+
             # Check for cached embeddings
-            embedding_cache_file = self.cache_dir / f"embeddings_{self._get_file_hash()}.pkl"
-            
+            embedding_cache_file = self.cache_dir / \
+                f"embeddings_{self._get_file_hash()}.pkl"
+
             if embedding_cache_file.exists():
                 print("🚀 Loading cached embeddings...")
                 try:
@@ -654,22 +679,26 @@ class PortfolioAssistant:
                             embeddings = self._ensure_list_format(embeddings)
                             print("✅ Using cached embeddings")
                         else:
-                            raise ValueError("Cached embeddings don't match current texts")
+                            raise ValueError(
+                                "Cached embeddings don't match current texts")
                 except Exception as e:
                     print(f"⚠️ Cache invalid ({e}), regenerating...")
                     embeddings = self._generate_embeddings(corpus_texts)
-                    self._cache_embeddings(corpus_texts, embeddings, embedding_cache_file)
+                    self._cache_embeddings(
+                        corpus_texts, embeddings, embedding_cache_file)
             else:
                 embeddings = self._generate_embeddings(corpus_texts)
-                self._cache_embeddings(corpus_texts, embeddings, embedding_cache_file)
-            
+                self._cache_embeddings(
+                    corpus_texts, embeddings, embedding_cache_file)
+
             # Add to ChromaDB in batches for better performance
             batch_size = 10
             for i in range(0, len(corpus_texts), batch_size):
                 batch_texts = corpus_texts[i:i+batch_size]
                 batch_embeddings = embeddings[i:i+batch_size]
-                batch_ids = [f"proj_{j}" for j in range(i, min(i+batch_size, len(corpus_texts)))]
-                
+                batch_ids = [f"proj_{j}" for j in range(
+                    i, min(i+batch_size, len(corpus_texts)))]
+
                 # Create metadata for each project including type
                 batch_metadatas = []
                 for j in range(i, min(i+batch_size, len(corpus_texts))):
@@ -682,51 +711,55 @@ class PortfolioAssistant:
                         "image": project.get("image", "")
                     }
                     batch_metadatas.append(metadata)
-                
+
                 self.collection.add(
                     documents=batch_texts,
                     embeddings=batch_embeddings,
                     ids=batch_ids,
                     metadatas=batch_metadatas
                 )
-            
-            print(f"✅ Added {len(corpus_texts)} projects to ChromaDB (optimized)")
-            
+
+            print(
+                f"✅ Added {len(corpus_texts)} projects to ChromaDB (optimized)")
+
         except Exception as e:
             print(f"❌ Error populating database: {e}")
-    
+
     def _ensure_list_format(self, embeddings) -> List[List[float]]:
         """Ensure embeddings are in proper list format for ChromaDB."""
         # Handle different input types
         if embeddings is None:
             return []
-        
+
         # If it's a list of tensors, convert each one
         if isinstance(embeddings, list) and len(embeddings) > 0:
             if hasattr(embeddings[0], 'numpy'):  # List of PyTorch tensors
-                embeddings = [emb.numpy().tolist() if hasattr(emb, 'numpy') else emb for emb in embeddings]
+                embeddings = [emb.numpy().tolist() if hasattr(
+                    emb, 'numpy') else emb for emb in embeddings]
             elif hasattr(embeddings[0], 'tolist'):  # List of numpy arrays
-                embeddings = [emb.tolist() if hasattr(emb, 'tolist') else emb for emb in embeddings]
+                embeddings = [emb.tolist() if hasattr(
+                    emb, 'tolist') else emb for emb in embeddings]
             return embeddings
-        
+
         # If it's a single tensor or numpy array
         if hasattr(embeddings, 'numpy'):  # PyTorch tensor
             embeddings = embeddings.numpy()
-        
+
         # Convert numpy array to list of lists
         if hasattr(embeddings, 'tolist'):
             return embeddings.tolist()
-        
+
         return embeddings
 
     def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings with progress indication."""
         print(f"🔄 Generating embeddings for {len(texts)} documents...")
-        embeddings = self.model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
-        
+        embeddings = self.model.encode(
+            texts, show_progress_bar=False, convert_to_numpy=True)
+
         # Ensure proper format using helper method
         return self._ensure_list_format(embeddings)
-    
+
     def _cache_embeddings(self, texts: List[str], embeddings: List[List[float]], cache_file: Path):
         """Cache embeddings to disk for faster future loading."""
         try:
@@ -741,7 +774,7 @@ class PortfolioAssistant:
             print(f"💾 Embeddings cached to {cache_file}")
         except Exception as e:
             print(f"⚠️ Failed to cache embeddings: {e}")
-    
+
     def query_portfolio(self, question: str, top_k: int = 3, filter_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Query the portfolio database for relevant projects (with optional type filter)."""
         self._ensure_initialized()
@@ -750,13 +783,16 @@ class PortfolioAssistant:
             return []
 
         # First, try direct name matching for exact project names
-        direct_matches = self._find_direct_project_matches(question, filter_type)
+        direct_matches = self._find_direct_project_matches(
+            question, filter_type)
         if direct_matches:
-            print(f"🎯 Found direct project name match: {[m['metadata']['name'] for m in direct_matches]}")
+            print(
+                f"🎯 Found direct project name match: {[m['metadata']['name'] for m in direct_matches]}")
             return direct_matches[:top_k]
 
         try:
-            q_embedding = self.model.encode([question], convert_to_numpy=True)[0]
+            q_embedding = self.model.encode(
+                [question], convert_to_numpy=True)[0]
             q_embedding_list = self._ensure_list_format([q_embedding])
             q_embedding = q_embedding_list[0] if q_embedding_list else []
 
@@ -772,7 +808,8 @@ class PortfolioAssistant:
 
             if documents:
                 distances = results.get('distances', [[]])[0]
-                print(f"🔍 Found {len(documents)} relevant projects (best match: {distances[0]:.3f})")
+                print(
+                    f"🔍 Found {len(documents)} relevant projects (best match: {distances[0]:.3f})")
 
             return [
                 {
@@ -785,18 +822,18 @@ class PortfolioAssistant:
         except Exception as e:
             print(f"❌ Error querying portfolio: {e}")
             return []
-    
+
     def _find_direct_project_matches(self, question: str, filter_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Find projects by direct name matching and skill-based matching before falling back to semantic search."""
         question_lower = question.lower().strip()
-        
+
         # Special handling for manufacturing queries - prioritize AIDA project
         if "manufacturing" in question_lower and filter_type == "electrical":
             for i, project in enumerate(self.projects):
-                if (project.get("type") == "electrical" and 
+                if (project.get("type") == "electrical" and
                     "aida" in project.get("name", "").lower() and
-                    "manufacturing" in " ".join(project.get("skills", [])).lower()):
-                    
+                        "manufacturing" in " ".join(project.get("skills", [])).lower()):
+
                     # Create the same format as ChromaDB results for AIDA project
                     text = f"""Project: {project['name']}
                         Description: {project['description']}
@@ -804,7 +841,7 @@ class PortfolioAssistant:
                         Code URL: {project.get("code_url", "N/A")}
                         Notes:
                         - """ + "\n- ".join(project.get('notes', []))
-                    
+
                     return [{
                         "text": text.strip(),
                         "metadata": {
@@ -815,26 +852,28 @@ class PortfolioAssistant:
                             "image": project.get("image", "")
                         }
                     }]
-        
+
         # Remove common query words to extract project name
-        query_words = ["what", "is", "tell", "me", "about", "@bot", "whats", "what's"]
+        query_words = ["what", "is", "tell", "me",
+                       "about", "@bot", "whats", "what's"]
         for word in query_words:
             question_lower = question_lower.replace(word, "").strip()
-        
+
         matches = []
-        
+
         for i, project in enumerate(self.projects):
             # Skip if filter doesn't match
             if filter_type and project.get("type") != filter_type:
                 continue
-                
+
             project_name = project["name"].lower()
-            
+
             # Check if the cleaned question matches the project name (full or partial)
-            if (question_lower in project_name or 
-                project_name.split()[0] in question_lower or  # First word of project name
-                any(word in project_name for word in question_lower.split() if len(word) > 3)):  # Significant words
-                
+            if (question_lower in project_name or
+                # First word of project name
+                project_name.split()[0] in question_lower or
+                    any(word in project_name for word in question_lower.split() if len(word) > 3)):  # Significant words
+
                 # Create the same format as ChromaDB results
                 text = f"""Project: {project['name']}
                     Description: {project['description']}
@@ -844,7 +883,7 @@ class PortfolioAssistant:
                     - """ + "\n- ".join(project.get('notes', []))
                 if project.get("image"):
                     text += f"\nImage: {project['image']}"
-                    
+
                 matches.append({
                     "text": text.strip(),
                     "metadata": {
@@ -855,11 +894,9 @@ class PortfolioAssistant:
                         "image": project.get("image", "")
                     }
                 })
-                
+
         return matches
 
-    
-    
     def ask_ollama_stream(self, query: str, matches: List[str], user_id: str = "default", filter_type: str = None) -> Iterator[str]:
         """Generate streaming response using Ollama HTTP API with relevant project context."""
         print(f"[📤] Sending prompt to Ollama model: {OLLAMA_CONFIG['MODEL']}")
@@ -867,7 +904,7 @@ class PortfolioAssistant:
             if not matches:
                 yield self._get_fallback_response(query)
                 return
-            
+
             # Check if any matches have images - be selective based on query type
             projects_with_images = []
             query_lower = query.lower()
@@ -875,7 +912,7 @@ class PortfolioAssistant:
             # Show images for visual requests OR when asking about experience/projects in domains that have images
             should_show_images = any(phrase in query_lower for phrase in [
                 "show me", "images", "pictures", "photos", "visual", "see the", "look at",
-                "projects he built", "project showcases", "manufacturing projects", 
+                "projects he built", "project showcases", "manufacturing projects",
                 "hobby projects", "electronics projects", "hardware projects",
                 "press projects", "assembly projects", "view projects",
                 # Experience-based queries that should show images if available
@@ -886,10 +923,10 @@ class PortfolioAssistant:
 
             # Detect if this is a broad project listing query
             is_broad_query = any(phrase in query_lower for phrase in [
-                "programming projects", "software projects", "projects", "portfolio", 
+                "programming projects", "software projects", "projects", "portfolio",
                 "all projects", "what projects", "work on", "built", "developed"
             ])
-            
+
             # Only populate images if the query specifically requests visual information
             if should_show_images:
                 if is_broad_query:
@@ -897,17 +934,17 @@ class PortfolioAssistant:
                     for m in matches[:2]:  # Only consider top 2 most relevant matches
                         image_path = m['metadata'].get('image', '')
                         project_name = m['metadata'].get('name', '').lower()
-                        
+
                         # Skip projects that don't match the query context
                         if any(word in query_lower for word in ["manufacturing", "press", "assembly", "tonnage", "aida", "servo"]):
                             # For manufacturing queries, prefer AIDA project
                             if "tegg" in project_name and "aida" not in project_name:
                                 continue
                         elif any(word in query_lower for word in ["electrical", "qa", "infrared", "tegg", "thermal"]):
-                            # For electrical QA queries, prefer TEGG project  
+                            # For electrical QA queries, prefer TEGG project
                             if "aida" in project_name and "tegg" not in project_name:
                                 continue
-                            
+
                         if image_path and image_path.strip():
                             projects_with_images.append({
                                 'name': m['metadata'].get('name', 'Project'),
@@ -923,11 +960,11 @@ class PortfolioAssistant:
                                 'name': top_match['metadata'].get('name', 'Project'),
                                 'image': image_path
                             })
-            
+
             # Store image data globally for button clicks (shared across all users)
             if projects_with_images:
                 self.current_project_images = projects_with_images
-            
+
             # Create context from matches
             context_parts = []
             for m in matches:
@@ -950,22 +987,22 @@ class PortfolioAssistant:
                 )
 
             context = "\n---\n".join(context_parts)
-            
+
             # Use current active prompt style
             current_style = PROMPT_CONFIG["CURRENT_STYLE"]
             prompt_template = PROMPT_CONFIG["STYLES"][current_style]
             prompt = prompt_template.format(context=context, query=query)
-            
+
             # Call Ollama HTTP API with streaming
             payload = {
                 "model": OLLAMA_CONFIG["MODEL"],
                 "prompt": prompt,
                 "stream": OLLAMA_CONFIG["STREAM"]
             }
-            
+
             # Send initial status
             yield f"[STATUS|Passing data to LLM...]"
-            
+
             try:
                 response = requests.post(
                     OLLAMA_CONFIG["API_URL"],
@@ -973,67 +1010,66 @@ class PortfolioAssistant:
                     stream=True,
                     timeout=OLLAMA_CONFIG["TIMEOUT"]
                 )
-                
+
                 if response.status_code == 200:
                     buffer = ""
                     response_complete = False
                     chunks_received = 0
-                    
+
                     # Send "connected" status when we start receiving data
                     yield f"[STATUS|Generating response...]"
-                    
+
                     for line in response.iter_lines():
                         if line:
                             try:
                                 data = json.loads(line.decode('utf-8'))
-                                
+
                                 if 'response' in data:
                                     chunk = data['response']
                                     buffer += chunk
                                     chunks_received += 1
-                                    
+
                                     # Send status update every 10 chunks
                                     if chunks_received % 10 == 0:
                                         yield f"[STATUS|Generated {chunks_received} chunks...]"
-                                    
+
                                     # Yield complete words/sentences for smoother display
                                     if chunk in [' ', '.', '!', '?', '\n'] or len(buffer) >= 10:
                                         yield buffer
                                         buffer = ""
-                                
+
                                 # Check if generation is done
                                 if data.get('done', False):
                                     if buffer:  # Yield any remaining content
                                         yield buffer
                                     response_complete = True
                                     break
-                                    
+
                             except json.JSONDecodeError:
                                 continue
-                    
+
                     # Add image button if response completed successfully and we have images
                     if response_complete and projects_with_images:
                         yield "\n\n[BUTTON|view_project_images|View Images]"
 
                     # save query and response to db
                     self.save_query_and_response(query, buffer, user_id)
-                    
-                        
+
                 else:
                     print(f"❌ Ollama HTTP error: {response.status_code}")
                     yield self._get_simple_response(matches, query)
-                    
+
             except requests.exceptions.ConnectionError:
                 print("❌ Cannot connect to Ollama - is it running?")
                 yield self._get_simple_response(matches, query)
             except requests.exceptions.Timeout:
                 print("⏰ Ollama request timed out")
                 yield "I'm thinking about that... Could you try asking again in a moment?"
-                
+
         except Exception as e:
             print(f"❌ Error with Ollama streaming: {e}")
             yield self._get_simple_response(matches, query)
-    
+
     def _get_simple_response(self, matches: List[Dict[str, Any]], query: str) -> str:
         if not matches:
             return self._get_fallback_response(query)
@@ -1044,17 +1080,16 @@ class PortfolioAssistant:
         skills = meta.get("skills", "").split(", ")[:3]
         code_url = meta.get("code_url")
         image = meta.get("image")
-        
+
         response = f"I worked on {project_name}, which involved {', '.join(skills)}."
-        
+
         # Always include GitHub link if available (and not empty/N/A)
         if code_url and code_url != "N/A" and code_url.strip():
             response += f"\n\n**GitHub:** {code_url}"
-        
+
         if image:
             response += f"\n\nImages available: {image}"
         return response
-
 
     def _get_fallback_response(self, query: str) -> str:
         """Provide fallback response when no relevant projects found."""
@@ -1064,7 +1099,7 @@ class PortfolioAssistant:
             "I'd love to help! My projects involve modern web development, AI, and software engineering. What would you like to explore?",
             "Interesting! I work with technologies like Python, React, and AI systems. Is there a particular project type you're curious about?"
         ]
-        
+
         import random
         return random.choice(fallbacks)
 
@@ -1072,31 +1107,31 @@ class PortfolioAssistant:
         """Provide response when question is not portfolio-related."""
         responses = [
             "I'm Ryan's portfolio assistant, so I can only help with questions about his professional work, projects, and technical skills. Feel free to ask about his programming projects, electrical engineering work, or hobby builds!",
-            
+
             "I specialize in discussing Ryan's technical expertise and projects. I'd be happy to tell you about his software development work, manufacturing experience, or electronics projects instead!",
-            
+
             "That's outside my area - I focus on Ryan's portfolio and professional experience. Ask me about his Python projects, electrical QA work, or hardware builds!",
-            
+
             "I'm here to discuss Ryan's technical work and projects. I can tell you about his programming skills, manufacturing experience, or hobby electronics - what interests you?",
-            
+
             "I only cover Ryan's professional portfolio and technical projects. Try asking about his software development, electrical engineering work, or PCB designs!"
         ]
-        
+
         import random
         return random.choice(responses)
-    
+
     def get_response_stream(self, query: str, user_id: str = "default") -> Iterator[str]:
         """Main optimized method to get a streaming response to a query, with hobby handling."""
-        
+
         # Check for button clicks first
         button_result = self.handle_button_click(query, user_id)
         if button_result:
             yield button_result
             return
-        
+
         # Clear any old global image data when starting a new query (not a button click)
         self.current_project_images = []
-        
+
         if not self.projects:
             yield self._get_fallback_response(query)
             return
@@ -1108,13 +1143,15 @@ class PortfolioAssistant:
             # Check if the query looks like a hobby selection (number or hobby name match)
             cleaned_query = query.strip().lower()
             hobby_projects = user_state.get("last_hobby_list", [])
-            
+
             # Is this a number selection (1, 2, 3)?
-            is_number_selection = cleaned_query.isdigit() and 1 <= int(cleaned_query) <= len(hobby_projects)
-            
+            is_number_selection = cleaned_query.isdigit() and 1 <= int(
+                cleaned_query) <= len(hobby_projects)
+
             # Is this a hobby name match?
-            is_name_match = any(cleaned_query in proj["name"].lower() for proj in hobby_projects)
-            
+            is_name_match = any(
+                cleaned_query in proj["name"].lower() for proj in hobby_projects)
+
             if is_number_selection or is_name_match:
                 # This looks like a hobby selection, handle it
                 result = self.handle_hobby_selection(query, user_id)
@@ -1122,14 +1159,15 @@ class PortfolioAssistant:
                 return
             else:
                 # This is a different question, clear the hobby state and continue processing
-                print(f"[DEBUG] Clearing hobby state for unrelated query: {query}")
+                print(
+                    f"[DEBUG] Clearing hobby state for unrelated query: {query}")
                 user_state["awaiting_hobby_choice"] = False
                 user_state["last_hobby_list"] = []
                 # Continue processing the new query below
 
         # If user asked about hobbies - expanded detection
         hobby_keywords = [
-            "hobbies", "hobby projects", "hobby project", "personal projects", 
+            "hobbies", "hobby projects", "hobby project", "personal projects",
             "hardware projects", "electronics projects", "diy projects",
             "side projects", "hobby showcases", "hobby work", "what hobbies",
             "tell me about his hobbies", "hardware work", "electronics work"
@@ -1137,7 +1175,7 @@ class PortfolioAssistant:
         if any(keyword in query.lower() for keyword in hobby_keywords):
             yield self.handle_hobby_list(user_id)
             return
-        
+
         # Intercept software/project list questions and respond with predefined text
         if any(kw in query.lower() for kw in [
             "programming projects", "software projects", "code projects", "python projects",
@@ -1153,19 +1191,23 @@ class PortfolioAssistant:
 
         try:
             filter_type = self.infer_filter_type(query)
-            print(f"[DEBUG] Filter type detected: {filter_type} for query: '{query}'")
-            
+            print(
+                f"[DEBUG] Filter type detected: {filter_type} for query: '{query}'")
+
             # Detect broad queries that should return more results
             is_broad_query = any(phrase in query.lower() for phrase in [
-                "programming projects", "software projects", "projects", "portfolio", 
+                "programming projects", "software projects", "projects", "portfolio",
                 "all projects", "what projects", "work on", "built", "developed"
             ])
-            
+
             # Use more results for broad queries
             top_k = 6 if is_broad_query else 3
-            matches = self.query_portfolio(query, top_k=top_k, filter_type=filter_type)
-            print(f"[DEBUG] Found {len(matches)} matches for '{query}' (filter={filter_type}, top_k={top_k})")
-            print(f"[DEBUG] Project names: {[m.get('metadata', {}).get('name', 'Unknown') for m in matches]}")
+            matches = self.query_portfolio(
+                query, top_k=top_k, filter_type=filter_type)
+            print(
+                f"[DEBUG] Found {len(matches)} matches for '{query}' (filter={filter_type}, top_k={top_k})")
+            print(
+                f"[DEBUG] Project names: {[m.get('metadata', {}).get('name', 'Unknown') for m in matches]}")
             yield from self.ask_ollama_stream(query, matches, user_id, filter_type)
         except Exception as e:
             print(f"❌ Error getting streaming response: {e}")
@@ -1187,47 +1229,47 @@ class PortfolioAssistant:
     def is_portfolio_related(self, question: str) -> bool:
         """Check if a question is related to portfolio topics (projects, skills, experience)."""
         q = question.lower()
-        
+
         # Portfolio-related keywords
         portfolio_keywords = [
             # General portfolio terms
             "project", "projects", "work", "experience", "skill", "skills", "portfolio", "built", "developed", "created",
             "technologies", "technology", "expertise", "background", "accomplishments", "achievements",
-            
+
             # Programming/Software
-            "programming", "software", "python", "javascript", "code", "coding", "github", "api", "websocket", 
-            "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "app", "application", 
+            "programming", "software", "python", "javascript", "code", "coding", "github", "api", "websocket",
+            "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "app", "application",
             "development", "web", "fullstack", "framework", "database", "algorithm", "nlp", "machine learning",
             "tensorflow", "keras", "rust", "pydantic", "jwt", "authentication", "encryption",
-            
+
             # Electrical/Manufacturing
-            "electrical", "qa", "infrared", "tegg", "thermal", "ultrasonic", "power distribution", "voltage", 
-            "inspection", "manufacturing", "press", "assembly", "retrofit", "tonnage", "metric", "aida", 
+            "electrical", "qa", "infrared", "tegg", "thermal", "ultrasonic", "power distribution", "voltage",
+            "inspection", "manufacturing", "press", "assembly", "retrofit", "tonnage", "metric", "aida",
             "servo", "mechanical", "industrial", "production",
-            
+
             # Hardware/Hobbies
-            "hardware", "hobby", "hobbies", "pcb", "etching", "soldering", "prototyping", "embedded", 
-            "microcontroller", "midi", "ble", "rgb", "led", "strip", "guitar", "overlay", "effects", 
+            "hardware", "hobby", "hobbies", "pcb", "etching", "soldering", "prototyping", "embedded",
+            "microcontroller", "midi", "ble", "rgb", "led", "strip", "guitar", "overlay", "effects",
             "musical", "interface", "design", "electronics", "circuit", "van", "esp32", "controller",
-            
+
             # Technical skills
             "technical", "engineering", "architect", "design", "implementation", "testing", "debugging",
             "optimization", "performance", "security", "scalability"
         ]
-        
+
         # Check if any portfolio keywords are present
         if any(keyword in q for keyword in portfolio_keywords):
             return True
-            
+
         # Check for common question patterns about portfolio
         portfolio_patterns = [
             "what did", "what have", "tell me about", "show me", "can you", "how did", "what projects",
             "what work", "what experience", "what skills", "what technologies", "what tools"
         ]
-        
+
         if any(pattern in q for pattern in portfolio_patterns):
             return True
-            
+
         return False
 
     def infer_filter_type(self, question: str) -> Optional[str]:
@@ -1237,8 +1279,8 @@ class PortfolioAssistant:
         # Manufacturing/Industrial projects (AIDA press work)
         if any(word in q for word in ["manufacturing", "press", "assembly", "retrofit", "tonnage", "metric", "aida", "servo", "mechanical", "industrial", "production"]):
             return "electrical"  # AIDA project is stored as electrical type
-            
-        # Electrical projects (TEGG work) 
+
+        # Electrical projects (TEGG work)
         if any(word in q for word in ["electrical", "qa", "infrared", "tegg", "thermal", "ultrasonic", "power distribution", "voltage", "inspection"]):
             return "electrical"
 
@@ -1249,41 +1291,43 @@ class PortfolioAssistant:
 
         return None  # fallback to no filter
 
-    
-    def save_query_and_response(self, query: str, response: str, username: str = "unknown"):
-        """Save query and response to database with user information."""
+    def save_query_and_response(self, query: str, response: str, username: str = "unknown", ip_address: str = None):
+        """Save query and response to database with user information and IP address."""
         try:
             db = SessionLocal()
             chat_entry = ChatHistory(
                 username=username,
                 message=query,
                 response=response,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
+                ip_address=ip_address
             )
             db.add(chat_entry)
             db.commit()
-            print(f"💾 Saved chat history for user {username}")
+            print(
+                f"💾 Saved chat history for user {username} from {ip_address or 'unknown IP'}")
         except Exception as e:
             print(f"❌ Error saving chat history: {e}")
         finally:
             db.close()
-    
-    def save_response(self, query: str, username: str, response: str):
+
+    def save_response(self, query: str, username: str, response: str, ip_address: str = None):
         """Alias for save_query_and_response for compatibility."""
-        self.save_query_and_response(query, response, username)
-    
+        self.save_query_and_response(query, response, username, ip_address)
+
     def get_chat_history(self, username: str = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Retrieve chat history from database, optionally filtered by username."""
         try:
             db = SessionLocal()
             query = db.query(ChatHistory)
-            
+
             if username:
                 query = query.filter(ChatHistory.username == username)
-            
+
             # Order by timestamp descending (most recent first) and limit results
-            chat_history = query.order_by(ChatHistory.timestamp.desc()).limit(limit).all()
-            
+            chat_history = query.order_by(
+                ChatHistory.timestamp.desc()).limit(limit).all()
+
             # Convert to list of dictionaries
             history_list = []
             for entry in chat_history:
@@ -1292,20 +1336,21 @@ class PortfolioAssistant:
                     "username": entry.username,
                     "message": entry.message,
                     "response": entry.response,
-                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                    "ip_address": entry.ip_address
                 })
-            
+
             return history_list
-            
+
         except Exception as e:
             print(f"❌ Error retrieving chat history: {e}")
             return []
         finally:
             db.close()
-    
+
     @classmethod
     def cleanup_cache(cls):
         """Clean up class-level cached resources."""
         cls._model_cache = None
         cls._chroma_client = None
-        print("🧹 Cleaned up cached resources") 
+        print("🧹 Cleaned up cached resources")

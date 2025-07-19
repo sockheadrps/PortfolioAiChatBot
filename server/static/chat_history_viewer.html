@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat History Viewer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #555;
+      }
+
+      input,
+      select {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin: 5px;
+      }
+
+      button:hover {
+        background: #0056b3;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: #e9ecef;
+        padding: 15px;
+        border-radius: 6px;
+        text-align: center;
+      }
+
+      .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+      }
+
+      .chat-history {
+        max-height: 600px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .chat-entry {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        background: white;
+      }
+
+      .chat-entry:hover {
+        background: #f8f9fa;
+      }
+
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #666;
+      }
+
+      .username {
+        font-weight: bold;
+        color: #007bff;
+      }
+
+      .ip-address {
+        color: #28a745;
+        font-family: monospace;
+      }
+
+      .timestamp {
+        color: #6c757d;
+      }
+
+      .message {
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #007bff;
+      }
+
+      .response {
+        margin-top: 10px;
+        padding: 10px;
+        background: #e9ecef;
+        border-radius: 4px;
+        border-left: 3px solid #28a745;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+        gap: 10px;
+      }
+
+      .pagination button {
+        padding: 8px 12px;
+      }
+
+      .pagination span {
+        margin: 0 10px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📊 Chat History Viewer</h1>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label for="username">Username:</label>
+          <input type="text" id="username" placeholder="Filter by username" />
+        </div>
+
+        <div class="filter-group">
+          <label for="ip_address">IP Address:</label>
+          <input type="text" id="ip_address" placeholder="Filter by IP address" />
+        </div>
+
+        <div class="filter-group">
+          <label for="exclude_ips">Exclude IPs:</label>
+          <input type="text" id="exclude_ips" placeholder="127.0.0.1,192.168.1.1" />
+        </div>
+
+        <div class="filter-group">
+          <label for="sort_by">Sort By:</label>
+          <select id="sort_by">
+            <option value="timestamp">Timestamp</option>
+            <option value="username">Username</option>
+            <option value="ip_address">IP Address</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="sort_order">Sort Order:</label>
+          <select id="sort_order">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="limit">Limit:</label>
+          <input type="number" id="limit" value="50" min="1" max="1000" />
+        </div>
+      </div>
+
+      <div style="text-align: center">
+        <button onclick="loadChatHistory()">🔍 Load Chat History</button>
+        <button onclick="clearFilters()">🧹 Clear Filters</button>
+      </div>
+
+      <div id="stats" class="stats" style="display: none">
+        <div class="stat-card">
+          <div class="stat-number" id="total-count">0</div>
+          <div class="stat-label">Total Records</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="showing-count">0</div>
+          <div class="stat-label">Showing</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="offset">0</div>
+          <div class="stat-label">Offset</div>
+        </div>
+      </div>
+
+      <div id="error" class="error" style="display: none"></div>
+
+      <div id="loading" class="loading" style="display: none">Loading chat history...</div>
+
+      <div id="chat-history" class="chat-history"></div>
+
+      <div id="pagination" class="pagination" style="display: none">
+        <button onclick="previousPage()">← Previous</button>
+        <span id="page-info">Page 1</span>
+        <button onclick="nextPage()">Next →</button>
+      </div>
+    </div>
+
+    <script>
+      let currentOffset = 0;
+      let currentLimit = 50;
+      let totalCount = 0;
+
+      async function loadChatHistory(offset = 0) {
+        const username = document.getElementById('username').value;
+        const ip_address = document.getElementById('ip_address').value;
+        const exclude_ips = document.getElementById('exclude_ips').value;
+        const sort_by = document.getElementById('sort_by').value;
+        const sort_order = document.getElementById('sort_order').value;
+        const limit = parseInt(document.getElementById('limit').value) || 50;
+
+        // Show loading
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('chat-history').innerHTML = '';
+
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (username) params.append('username', username);
+        if (ip_address) params.append('ip_address', ip_address);
+        if (exclude_ips) params.append('exclude_ips', exclude_ips);
+        params.append('sort_by', sort_by);
+        params.append('sort_order', sort_order);
+        params.append('limit', limit);
+        params.append('offset', offset);
+
+        try {
+          const response = await fetch(`/chat-history-advanced?${params.toString()}`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || 'Failed to load chat history');
+          }
+
+          displayChatHistory(data);
+          currentOffset = offset;
+          currentLimit = limit;
+          totalCount = data.total_count;
+        } catch (error) {
+          document.getElementById('error').textContent = `Error: ${error.message}`;
+          document.getElementById('error').style.display = 'block';
+        } finally {
+          document.getElementById('loading').style.display = 'none';
+        }
+      }
+
+      function displayChatHistory(data) {
+        const container = document.getElementById('chat-history');
+        const stats = document.getElementById('stats');
+        const pagination = document.getElementById('pagination');
+
+        // Update stats
+        document.getElementById('total-count').textContent = data.total_count;
+        document.getElementById('showing-count').textContent = data.count;
+        document.getElementById('offset').textContent = data.offset;
+        stats.style.display = 'grid';
+
+        // Show/hide pagination
+        if (data.total_count > data.limit) {
+          pagination.style.display = 'flex';
+          const currentPage = Math.floor(data.offset / data.limit) + 1;
+          const totalPages = Math.ceil(data.total_count / data.limit);
+          document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        } else {
+          pagination.style.display = 'none';
+        }
+
+        // Display chat entries
+        if (data.chat_history.length === 0) {
+          container.innerHTML =
+            '<div class="loading">No chat history found with current filters.</div>';
+          return;
+        }
+
+        container.innerHTML = data.chat_history
+          .map(
+            (entry) => `
+                <div class="chat-entry">
+                    <div class="chat-header">
+                        <span class="username">👤 ${entry.username}</span>
+                        <span class="ip-address">🌐 ${entry.ip_address || 'Unknown'}</span>
+                        <span class="timestamp">🕒 ${new Date(
+                          entry.timestamp
+                        ).toLocaleString()}</span>
+                    </div>
+                    <div class="message">
+                        <strong>Message:</strong><br>
+                        ${entry.message}
+                    </div>
+                    <div class="response">
+                        <strong>Response:</strong><br>
+                        ${entry.response}
+                    </div>
+                </div>
+            `
+          )
+          .join('');
+      }
+
+      function clearFilters() {
+        document.getElementById('username').value = '';
+        document.getElementById('ip_address').value = '';
+        document.getElementById('exclude_ips').value = '';
+        document.getElementById('sort_by').value = 'timestamp';
+        document.getElementById('sort_order').value = 'desc';
+        document.getElementById('limit').value = '50';
+        loadChatHistory(0);
+      }
+
+      function previousPage() {
+        if (currentOffset > 0) {
+          const newOffset = Math.max(0, currentOffset - currentLimit);
+          loadChatHistory(newOffset);
+        }
+      }
+
+      function nextPage() {
+        if (currentOffset + currentLimit < totalCount) {
+          loadChatHistory(currentOffset + currentLimit);
+        }
+      }
+
+      // Load initial data
+      document.addEventListener('DOMContentLoaded', () => {
+        loadChatHistory();
+      });
+    </script>
+  </body>
+</html>

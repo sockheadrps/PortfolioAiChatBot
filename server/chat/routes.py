@@ -15,18 +15,18 @@ import asyncio
 from server.voice.synth import synthesize_to_base64
 
 
-
 router = APIRouter()
 manager = ConnectionManager()
 private_manager = PrivateConnectionManager()
 
 
-async def _handle_bot_button_click(bot, username: str, message: str, manager: ConnectionManager):
+async def _handle_bot_button_click(bot, username: str, message: str, manager: ConnectionManager, ip_address: str = None):
     """Handle bot responses to button clicks - process gallery commands without showing text"""
     try:
         # Get bot response to button click (usually gallery commands)
-        bot_response = bot.portfolio_assistant.handle_button_click(message, username)
-        
+        bot_response = bot.portfolio_assistant.handle_button_click(
+            message, username)
+
         if bot_response and bot_response.strip():
             # Check if response contains gallery commands
             if "[GALLERY_SHOW|" in bot_response:
@@ -48,7 +48,7 @@ async def _handle_bot_button_click(bot, username: str, message: str, manager: Co
                         "message": bot_response
                     }
                 }))
-        
+
     except Exception as e:
         print(f"❌ Error handling button click: {e}")
         # Send error message as regular chat to the specific user who clicked
@@ -61,14 +61,14 @@ async def _handle_bot_button_click(bot, username: str, message: str, manager: Co
         })
 
 
-async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager):
+async def _handle_bot_public_response(bot, username: str, message: str, manager: ConnectionManager, ip_address: str = None):
     """Handle bot responses to public chat messages with streaming support"""
-    
+
     message_lower = message.lower()
-    
+
     # Respond to @bot mentions OR button clicks OR if bot is waiting for input from this user
     bot_should_respond = False
-    
+
     if '@bot' in message_lower:
         bot_should_respond = True
     elif message.startswith("[BUTTON_CLICK|"):
@@ -81,37 +81,39 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                 # Only respond if the message looks like a hobby selection
                 # (number, project name, or direct hobby-related content)
                 cleaned_msg = message.strip().lower()
-                
+
                 # Check if it's a hobby selection (number 1-3, project names, or hobby-related)
                 is_hobby_selection = (
                     # Valid number selection
                     (cleaned_msg.isdigit() and 1 <= int(cleaned_msg) <= 3) or
                     # Contains hobby project keywords
                     any(word in cleaned_msg for word in [
-                        'esp32', 'van', 'controller', 'guitar', 'midi', 'overlay', 
+                        'esp32', 'van', 'controller', 'guitar', 'midi', 'overlay',
                         'ble', 'rgb', 'strip', 'pcb', 'mosfet'
                     ]) or
                     # Help/option requests
-                    any(word in cleaned_msg for word in ['help', 'options', 'list', 'show'])
+                    any(word in cleaned_msg for word in [
+                        'help', 'options', 'list', 'show'])
                 )
-                
+
                 # Explicitly NOT hobby selections (common chat messages + cancel commands)
                 is_chat_message = any(word in cleaned_msg for word in [
-                    'hi', 'hello', 'hey', 'thanks', 'thank you', 'ok', 'okay', 
+                    'hi', 'hello', 'hey', 'thanks', 'thank you', 'ok', 'okay',
                     'bye', 'goodbye', 'cool', 'nice', 'awesome', 'great',
                     'cancel', 'nevermind', 'never mind', 'stop', 'exit', 'quit'
                 ])
-                
+
                 # If it's clearly a chat message or not a hobby selection, clear the waiting state
                 if is_chat_message or not is_hobby_selection:
-                    print(f"🔄 Clearing hobby selection state for {username} - message: '{message}' (chat_message: {is_chat_message}, hobby_selection: {is_hobby_selection})")
+                    print(
+                        f"🔄 Clearing hobby selection state for {username} - message: '{message}' (chat_message: {is_chat_message}, hobby_selection: {is_hobby_selection})")
                     user_state["awaiting_hobby_choice"] = False
                     bot_should_respond = False
                 else:
                     bot_should_respond = True
         except Exception as e:
             print(f"❌ Error checking user state for routing: {e}")
-    
+
     if bot_should_respond:
         try:
             # Send typing indicator
@@ -122,24 +124,25 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                     "typing": True
                 }
             }))
-            
+
             # Add delay to make it feel more natural
             await asyncio.sleep(1.0)
-            
+
             # Generate streaming bot response using portfolio assistant
             response_buffer = ""
             is_first_chunk = True
-            
+
             try:
                 # Clean the message by removing @bot mentions (but not for button clicks)
                 cleaned_message = message
                 if '@bot' in message.lower() and not message.startswith("[BUTTON_CLICK|"):
                     import re
-                    cleaned_message = re.sub(r'@bot\b', '', message, flags=re.IGNORECASE).strip()
-                
+                    cleaned_message = re.sub(
+                        r'@bot\b', '', message, flags=re.IGNORECASE).strip()
+
                 total_chunks = 0
                 estimated_total_chunks = 50  # Rough estimate for progress calculation
-                
+
                 for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username):
                     if chunk:
                         # Check if this is a status marker
@@ -148,7 +151,7 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                             status_parts = chunk.strip("[]").split("|")
                             if len(status_parts) >= 2:
                                 status_message = status_parts[1]
-                                
+
                                 # Send status update
                                 await manager.broadcast(json.dumps({
                                     "event": "bot_message_stream",
@@ -163,7 +166,7 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         else:
                             # Regular text chunk
                             response_buffer += chunk
-                            
+
                             # Send streaming chunk
                             await manager.broadcast(json.dumps({
                                 "event": "bot_message_stream",
@@ -174,12 +177,12 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                                     "is_complete": False
                                 }
                             }))
-                        
+
                         is_first_chunk = False
-                        
+
                         # Small delay between chunks for better UX
                         await asyncio.sleep(0.1)
-                
+
                 # Send completion signal with 100% progress
                 await manager.broadcast(json.dumps({
                     "event": "bot_message_stream",
@@ -211,8 +214,9 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         "voice_b64": voice_b64  # Base64-encoded WAV
                     }
                 }))         # save the response to db
-                bot.portfolio_assistant.save_response(cleaned_message, username, response_buffer)
-                
+                bot.portfolio_assistant.save_response(
+                    cleaned_message, username, response_buffer, ip_address)
+
             except Exception as stream_error:
                 print(f"❌ Error in streaming response: {stream_error}")
                 # Fallback to complete message if streaming fails
@@ -222,7 +226,7 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                     for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username):
                         if chunk and not chunk.startswith("[PROGRESS|"):
                             fallback_response += chunk
-                    
+
                     await manager.broadcast(json.dumps({
                         "event": "chat_message",
                         "data": {
@@ -239,12 +243,12 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                             "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
                         }
                     }))
-            
+
         except Exception as e:
             print(f"❌ Error generating bot response: {e}")
             # Send a fallback response
             await manager.broadcast(json.dumps({
-                "event": "chat_message", 
+                "event": "chat_message",
                 "data": {
                     "user": bot.username,
                     "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
@@ -258,7 +262,8 @@ async def send_event(request: WsEvent):
         await manager.broadcast(request.model_dump_json())
         return {"status": "Event sent successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send event: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to send event: {str(e)}")
 
 
 @router.get("/chat-history")
@@ -267,13 +272,14 @@ async def get_chat_history(username: str = None, limit: int = 50):
     try:
         db = SessionLocal()
         query = db.query(ChatHistory)
-        
+
         if username:
             query = query.filter(ChatHistory.username == username)
-        
+
         # Order by timestamp descending (most recent first) and limit results
-        chat_history = query.order_by(ChatHistory.timestamp.desc()).limit(limit).all()
-        
+        chat_history = query.order_by(
+            ChatHistory.timestamp.desc()).limit(limit).all()
+
         # Convert to list of dictionaries
         history_list = []
         for entry in chat_history:
@@ -282,13 +288,15 @@ async def get_chat_history(username: str = None, limit: int = 50):
                 "username": entry.username,
                 "message": entry.message,
                 "response": entry.response,
-                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                "ip_address": entry.ip_address
             })
-        
+
         return {"chat_history": history_list, "count": len(history_list)}
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
     finally:
         db.close()
 
@@ -301,7 +309,7 @@ async def get_user_chat_history(username: str, limit: int = 50):
         chat_history = db.query(ChatHistory).filter(
             ChatHistory.username == username
         ).order_by(ChatHistory.timestamp.desc()).limit(limit).all()
-        
+
         # Convert to list of dictionaries
         history_list = []
         for entry in chat_history:
@@ -310,13 +318,132 @@ async def get_user_chat_history(username: str, limit: int = 50):
                 "username": entry.username,
                 "message": entry.message,
                 "response": entry.response,
-                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                "ip_address": entry.ip_address
             })
-        
+
         return {"chat_history": history_list, "count": len(history_list), "username": username}
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.get("/chat-history-advanced")
+async def get_advanced_chat_history(
+    username: str = None,
+    ip_address: str = None,
+    exclude_ips: str = None,
+    sort_by: str = "timestamp",
+    sort_order: str = "desc",
+    limit: int = 50,
+    offset: int = 0
+):
+    """
+    Get chat history with advanced filtering and sorting options.
+
+    Parameters:
+    - username: Filter by specific username
+    - ip_address: Filter by specific IP address
+    - exclude_ips: Comma-separated list of IP addresses to exclude
+    - sort_by: Field to sort by (timestamp, username, ip_address)
+    - sort_order: Sort order (asc, desc)
+    - limit: Number of results to return
+    - offset: Number of results to skip
+    """
+    try:
+        db = SessionLocal()
+        query = db.query(ChatHistory)
+
+        # Apply filters
+        if username:
+            query = query.filter(ChatHistory.username == username)
+
+        if ip_address:
+            query = query.filter(ChatHistory.ip_address == ip_address)
+
+        if exclude_ips:
+            # Split comma-separated IPs and exclude each one
+            excluded_ip_list = [ip.strip() for ip in exclude_ips.split(",")]
+            for excluded_ip in excluded_ip_list:
+                query = query.filter(ChatHistory.ip_address != excluded_ip)
+
+        # Apply sorting
+        if sort_by == "timestamp":
+            if sort_order.lower() == "asc":
+                query = query.order_by(ChatHistory.timestamp.asc())
+            else:
+                query = query.order_by(ChatHistory.timestamp.desc())
+        elif sort_by == "username":
+            if sort_order.lower() == "asc":
+                query = query.order_by(ChatHistory.username.asc())
+            else:
+                query = query.order_by(ChatHistory.username.desc())
+        elif sort_by == "ip_address":
+            if sort_order.lower() == "asc":
+                query = query.order_by(ChatHistory.ip_address.asc())
+            else:
+                query = query.order_by(ChatHistory.ip_address.desc())
+        else:
+            # Default to timestamp desc
+            query = query.order_by(ChatHistory.timestamp.desc())
+
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+
+        # Get total count for pagination info
+        total_count_query = db.query(ChatHistory)
+        if username:
+            total_count_query = total_count_query.filter(
+                ChatHistory.username == username)
+        if ip_address:
+            total_count_query = total_count_query.filter(
+                ChatHistory.ip_address == ip_address)
+        if exclude_ips:
+            excluded_ip_list = [ip.strip() for ip in exclude_ips.split(",")]
+            for excluded_ip in excluded_ip_list:
+                total_count_query = total_count_query.filter(
+                    ChatHistory.ip_address != excluded_ip)
+
+        total_count = total_count_query.count()
+
+        # Execute the main query
+        chat_history = query.all()
+
+        # Convert to list of dictionaries
+        history_list = []
+        for entry in chat_history:
+            history_list.append({
+                "id": entry.id,
+                "username": entry.username,
+                "message": entry.message,
+                "response": entry.response,
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                "ip_address": entry.ip_address
+            })
+
+        return {
+            "chat_history": history_list,
+            "count": len(history_list),
+            "total_count": total_count,
+            "offset": offset,
+            "limit": limit,
+            "filters": {
+                "username": username,
+                "ip_address": ip_address,
+                "exclude_ips": exclude_ips.split(",") if exclude_ips else None
+            },
+            "sorting": {
+                "sort_by": sort_by,
+                "sort_order": sort_order
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")
     finally:
         db.close()
 
@@ -327,11 +454,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         is_guest = payload.get("is_guest", False)
-        
+
         if username is None:
             await websocket.close(code=1008)
             return
-        
+
         # Both regular users and guests are allowed to connect
         # Guest usernames will have "guest_" prefix to distinguish them
     except JWTError:
@@ -340,7 +467,20 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
     await manager.connect(websocket, username)
     await private_manager.connect(websocket, username)
-    
+
+    # Get client IP address for tracking
+    client_ip = None
+    try:
+        # Try to get IP from headers first (for proxy/load balancer scenarios)
+        forwarded_for = websocket.headers.get("x-forwarded-for")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        else:
+            # Fallback to direct client IP
+            client_ip = websocket.client.host if websocket.client.host else "unknown"
+    except Exception:
+        client_ip = "unknown"
+
     # Initialize bot if not already done
     bot = get_bot()
     if bot is None:
@@ -353,33 +493,37 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
             if msg_type == "chat_message":
                 message_text = data["data"]["message"]
-                
+                # Use display name if provided, fallback to username
+                display_name = data["data"].get("displayName", username)
+
                 # Check if this is a button click - don't broadcast button clicks
                 is_button_click = message_text.startswith("[BUTTON_CLICK|")
-                
+
                 if not is_button_click:
                     # Broadcast the user's message (but not button clicks)
                     await manager.broadcast(json.dumps({
                         "event": "chat_message",
                         "data": {
-                            "user": username,
+                            "user": display_name,  # Use display name for display
                             "message": message_text
                         }
                     }))
-                
+
                 # Check if bot should respond to public message
                 bot = get_bot()
                 if bot and username != bot.username:
                     if is_button_click:
                         # Handle button clicks separately - don't broadcast the response as text
-                        asyncio.create_task(_handle_bot_button_click(bot, username, message_text, manager))
+                        asyncio.create_task(_handle_bot_button_click(
+                            bot, username, message_text, manager, client_ip))
                     else:
                         # Start bot response handling in background (don't await)
-                        asyncio.create_task(_handle_bot_public_response(bot, username, message_text, manager))
+                        asyncio.create_task(_handle_bot_public_response(
+                            bot, username, message_text, manager, client_ip))
 
             elif msg_type == "pm_invite":
                 recipient = data.get("to")
-                
+
                 # Check if the recipient is the bot
                 bot = get_bot()
                 if bot and recipient == bot.username:
@@ -409,7 +553,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             elif msg_type == "pm_message":
                 recipient = data.get("to")
                 ciphertext = data.get("ciphertext")
-                
+
                 # Check if the recipient is the bot
                 bot = get_bot()
                 if bot and recipient == bot.username:
@@ -425,7 +569,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
             elif msg_type == "pm_disconnect":
                 recipient = data.get("to")
-                
+
                 # Check if the recipient is the bot
                 bot = get_bot()
                 if bot and recipient == bot.username:
@@ -440,7 +584,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
             elif msg_type == "pubkey_request":
                 recipient = data.get("to")
-                
+
                 # Check if the recipient is the bot
                 bot = get_bot()
                 if bot and recipient == bot.username:
@@ -456,7 +600,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             elif msg_type == "pubkey_response":
                 recipient = data.get("to")
                 public_key = data.get("public_key")
-                
+
                 # Check if the recipient is the bot
                 bot = get_bot()
                 if bot and recipient == bot.username:
@@ -469,6 +613,18 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                         "from": username,
                         "public_key": public_key
                     })
+
+            elif msg_type == "display_name_change":
+                print(f"🔄 Display name change: {data}")
+                display_name = data["data"]["displayName"]
+                # Broadcast the display name change to all other users
+                await manager.broadcast(json.dumps({
+                    "event": "display_name_change",
+                    "data": {
+                        "username": username,
+                        "displayName": display_name
+                    }
+                }))
 
             elif msg_type == "pubkey":
                 private_manager.register_pubkey(username, data["key"])

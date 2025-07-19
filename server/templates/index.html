@@ -21,6 +21,18 @@
       <div class="user-info">
         <span class="logged-in-text">Logged in as:</span>
         <span id="current-user" class="username-display"></span>
+        <button id="edit-username-btn" title="Change display name" style="margin-left: 8px">
+          ✏️
+        </button>
+        <input
+          id="edit-username-input"
+          type="text"
+          class="edit-username-input"
+          style="display: none; margin-left: 8px; width: 120px"
+          maxlength="24"
+        />
+        <button id="save-username-btn" style="display: none; margin-left: 4px">Save</button>
+        <button id="cancel-username-btn" style="display: none; margin-left: 2px">Cancel</button>
       </div>
       <div class="header-controls">
         <button id="settings-btn" class="settings-btn" title="Background Settings">
@@ -131,6 +143,9 @@
     <div id="invite-toast-container"></div>
     <div id="tooltip-container"></div>
 
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
     <div class="layout-container">
       <div class="users-toggle" id="users-toggle" title="Hide Users Panel">◀</div>
 
@@ -140,6 +155,73 @@
       </div>
 
       <div class="main-container">
+        <div class="info-toggle" id="info-toggle" title="Hide Info Panel">▶</div>
+
+        <div id="info-panel" class="panel-loading">
+          <h3>💡 Quick Questions</h3>
+          <div class="info-content">
+            <div class="info-section">
+              <h4>🔧 Electrical & Manufacturing</h4>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Does he have electrical QA experience?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his manufacturing experience</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What power distribution work has he done?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me manufacturing projects</span
+                >
+              </div>
+            </div>
+
+            <div class="info-section">
+              <h4>💻 Programming & Software</h4>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What are his software projects?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What programming languages does he use?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me his Python projects</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his GitHub projects</span
+                >
+              </div>
+            </div>
+
+            <div class="info-section">
+              <h4>🛠️ Hardware & Hobbies</h4>
+              <div class="example-questions">
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >What are Ryan's hobbies?</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Show me electronics projects</span
+                >
+                <span class="example-tag" onclick="insertQuestion(this)"
+                  >Tell me about his hardware projects</span
+                >
+              </div>
+            </div>
+
+            <div class="info-section">
+              <h4>💡 Tips</h4>
+              <ul>
+                <li>Click any suggestion above to auto-fill the message box</li>
+                <li>Ask about specific skills, technologies, or project types</li>
+                <li>Request to see images: "Show me manufacturing projects"</li>
+                <li>Be specific: "What Python libraries has he used?"</li>
+              </ul>
+            </div>
+          </div>
+        </div>
         <div id="chat-container">
           <div class="chat-header">
             <div class="audio-controls">
@@ -223,54 +305,98 @@
         </div>
         <div class="modal-body">
           <div class="welcome-section">
-            <h3>🔧 Electrical & Manufacturing</h3>
-            <div class="example-questions">
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Does he have electrical QA experience?</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Tell me about his manufacturing experience</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >What power distribution work has he done?</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Show me manufacturing projects</span
-              >
-            </div>
+            <h3>🧠 The AI Assistant</h3>
+            <p>
+              Local, RAG-powered, domain-specific assistant for portfolio/project Q&A and
+              exploration, using python and SentenceTransformers to embed project data and queries
+              for semantic retrieval.
+            </p>
+            <p>
+              The audio is generated using training data of my own voice and Piper TTS, a fast,
+              local neural text-to-speech engine that uses embedded espeak-ng for phonemization.
+            </p>
           </div>
 
           <div class="welcome-section">
-            <h3>💻 Programming & Software</h3>
-            <div class="example-questions">
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >What are his software projects?</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >What programming languages does he use?</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Show me his Python projects</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Tell me about his GitHub projects</span
-              >
-            </div>
+            <h3>🤖 Chat with the Bot</h3>
+            <p>
+              Toggle the <strong>"Ask Bot"</strong> switch next to the message input, then just type
+              naturally!
+            </p>
           </div>
 
           <div class="welcome-section">
-            <h3>🛠️ Hardware & Hobbies</h3>
-            <div class="example-questions">
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >What are Ryan's hobbies?</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Show me electronics projects</span
-              >
-              <span class="example-tag" onclick="insertQuestion(this)"
-                >Tell me about his hardware projects</span
-              >
-            </div>
+            <h3>🔊 Text-to-Speech Audio</h3>
+            <p>
+              The bot can read its responses aloud using text-to-speech. You have full control over
+              the audio settings:
+            </p>
+            <ul>
+              <li>
+                <strong>🔊 / 🔇 Audio Toggle:</strong> Click the audio icon to enable or disable
+                spoken responses. Disabling it will mute all audio and immediately stop any that's
+                currently playing.
+              </li>
+              <li>
+                <strong>🎚️ Volume Slider:</strong> Hover over the audio icon to reveal a volume
+                control. Slide from 0% (mute) to 100% (maximum volume).
+              </li>
+              <li>
+                <strong>⚡ Speed Control:</strong> Scroll up/down on the speed button (⚡) to adjust
+                playback speed from 0.5x (slow) to 2.0x (fast) in 0.1 increments. Changes apply in
+                real-time.
+              </li>
+            </ul>
+          </div>
+
+          <div class="welcome-section">
+            <h3>❓ Help & Navigation</h3>
+            <ul>
+              <li>
+                <strong>Help Button (?):</strong> Click the question mark button in the chat header
+                for example questions and tips.
+              </li>
+              <li>
+                <strong>Users Panel:</strong> Click the users toggle (👥) to see online users and
+                start private chats.
+              </li>
+            </ul>
+          </div>
+
+          <div class="welcome-section">
+            <h3>🔒 Privacy & Security</h3>
+            <ul>
+              <li>
+                <strong>Public Chat:</strong> When the "Ask Bot" toggle is OFF, you're in public
+                chat mode. All messages are unencrypted and visible to anyone logged in.
+              </li>
+              <li>
+                <strong>Private Messages:</strong> Click on any username in the online users list to
+                start a private message (PM).
+              </li>
+              <li>
+                <strong>End-to-End Encryption:</strong> PMs use RSA encryption for secure
+                communication between users.
+              </li>
+              <li>
+                <strong>Bot Interactions:</strong> When the toggle is ON, your messages to the bot
+                are part of the public chat but focused on getting information.
+              </li>
+            </ul>
+          </div>
+
+          <div class="welcome-section">
+            <h3>💡 Tips</h3>
+            <ul>
+              <li>The bot understands context and provides detailed technical information</li>
+              <li>Ask about specific technologies, skills, or project types</li>
+              <li>Get contextual answers about any aspect of Ryan's work</li>
+              <li>
+                <em
+                  >Note: AI responses may not be 100% accurate. Always verify important details.</em
+                >
+              </li>
+            </ul>
           </div>
         </div>
         <div class="modal-footer">
