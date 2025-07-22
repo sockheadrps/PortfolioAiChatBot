@@ -1,3 +1,4 @@
+from server.voice.synth import synthesize_to_base64
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends
 from jose import jwt, JWTError
 from typing import List
@@ -12,9 +13,22 @@ from server.chat.private_manager import PrivateConnectionManager
 from server.chat.bot_user import initialize_bot, get_bot
 from server.db.db import SessionLocal
 from server.db.dbmodels import ChatHistory
-from server.cache.client_cache import client_cache
-import asyncio
-from server.voice.synth import synthesize_to_base64
+# from server.cache.client_cache import client_cache  # DISABLED
+# Create dummy client_cache object since it's referenced in the code
+
+
+class DummyClientCache:
+    def get_cached_response(self, message):
+        return None
+
+    def increment_hit_count(self, message):
+        pass
+
+    def cache_response(self, **kwargs):
+        pass
+
+
+client_cache = DummyClientCache()
 
 
 router = APIRouter()
@@ -153,8 +167,9 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                 cleaned_message = re.sub(
                     r'@bot\b', '', message, flags=re.IGNORECASE).strip()
 
-            # Check client cache first
-            cached_response = client_cache.get_cached_response(cleaned_message)
+            # Check client cache first (DISABLED)
+            # cached_response = client_cache.get_cached_response(cleaned_message)
+            cached_response = None
 
             # Check server cache (admin cache) if client cache miss
             server_cached_response = None
@@ -195,26 +210,93 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
             # Check if this query should bypass cache (for YouTube gallery functionality)
             # Only bypass if we have a cached response AND the query specifically requests fresh content
             should_bypass_cache = False
-            if cached_response or server_cached_response:
-                # Only bypass if user explicitly asks for fresh/new content
+
+            # Check for regenerate flag FIRST - this should always bypass cache
+            if "[REGENERATE]" in cleaned_message:
+                should_bypass_cache = True
+                cleaned_message = cleaned_message.replace(
+                    "[REGENERATE]", "").strip()
+                print(f"🔄 Regenerate flag detected, forcing cache bypass")
+                print(f"🔄 Original message: '{message}'")
+                print(f"🔄 Cleaned message: '{cleaned_message}'")
+
+            # Check if this would be a duplicate response (same as last response to this user)
+            # Only check for duplicates if regenerate flag is not present
+            would_be_duplicate = False
+            last_response_key = f"last_response_{username}"
+
+            if not should_bypass_cache and (cached_response or server_cached_response):
+                # Get the response that would be used
+                potential_response = None
+                if cached_response:
+                    potential_response = cached_response["response"]
+                elif server_cached_response:
+                    potential_response = server_cached_response["response"]
+
+                # Check if this is the same as the last response given to this user
+                if potential_response and hasattr(manager, last_response_key):
+                    last_response = getattr(manager, last_response_key, None)
+                    if last_response and last_response.strip() == potential_response.strip():
+                        would_be_duplicate = True
+                        print(
+                            f"🔄 Would be duplicate response for {username}, bypassing cache")
+                        should_bypass_cache = True
+
+            # Check for other bypass keywords (only if not already bypassing)
+            if not should_bypass_cache and (cached_response or server_cached_response):
                 bypass_keywords = [
                     "fresh", "new", "latest", "update", "recent", "current",
-                    "generate", "create", "make", "build", "develop"
+                    "generate", "create", "make", "build", "develop",
+                    "libraries", "programming", "python", "javascript", "code", "github",
+                    "repositories", "development", "software", "languages"
                 ]
-                should_bypass_cache = any(
-                    keyword in cleaned_message.lower() for keyword in bypass_keywords)
+                matching_bypass_keywords = [
+                    keyword for keyword in bypass_keywords if keyword in cleaned_message.lower()]
+                should_bypass_cache = len(matching_bypass_keywords) > 0
+                if matching_bypass_keywords:
+                    print(
+                        f"🔍 Found bypass keywords: {matching_bypass_keywords}")
+                    print(f"🔍 Bypassing cache due to programming keywords")
+
+            # Also bypass cache for any query that contains programming-related words (independent check)
+            if not should_bypass_cache:
+                programming_indicators = ["libraries", "programming", "python", "javascript", "code", "github",
+                                          "repositories", "development", "software", "languages", "frameworks", "tools", "technologies"]
+                matching_indicators = [
+                    indicator for indicator in programming_indicators if indicator in cleaned_message.lower()]
+                if matching_indicators:
+                    should_bypass_cache = True
+                    print(
+                        f"🔍 Found programming indicators: {matching_indicators}")
+                    print(f"🔍 Bypassing cache due to programming indicators in query")
 
             # Debug cache bypass logic
             print(f"🔍 Cache check for: '{cleaned_message}'")
             print(f"🔍 Client cache found: {cached_response is not None}")
+            if cached_response:
+                print(
+                    f"🔍 Client cache response preview: {cached_response['response'][:100]}...")
             print(
                 f"🔍 Server cache found: {server_cached_response is not None}")
+            if server_cached_response:
+                print(
+                    f"🔍 Server cache response preview: {server_cached_response['response'][:100]}...")
             print(f"🔍 Should bypass cache: {should_bypass_cache}")
+            print(f"🔍 Would be duplicate: {would_be_duplicate}")
+            print(
+                f"🔍 Original message contained [REGENERATE]: {'[REGENERATE]' in message}")
             if should_bypass_cache:
-                matching_keywords = [kw for kw in ["journey", "story", "professional", "background", "experience", "career",
-                                                   "how did you", "your journey", "your story", "electrician coder", "bridging"] if kw in cleaned_message.lower()]
-                print(f"🔍 Matching bypass keywords: {matching_keywords}")
+                if "[REGENERATE]" in message:
+                    print(f"🔍 Bypassing due to regenerate flag")
+                elif would_be_duplicate:
+                    print(f"🔍 Bypassing due to duplicate detection")
+                else:
+                    matching_keywords = [kw for kw in ["journey", "story", "professional", "background", "experience", "career",
+                                                       "how did you", "your journey", "your story", "electrician coder", "bridging"] if kw in cleaned_message.lower()]
+                    print(f"🔍 Matching bypass keywords: {matching_keywords}")
 
+            print(
+                f"🔍 Final cache decision - should_bypass_cache: {should_bypass_cache}")
             if (cached_response or server_cached_response) and not should_bypass_cache:
                 # Use cached response (prefer client cache, fallback to server cache)
                 if cached_response:
@@ -253,8 +335,8 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                                 f"🎯 Removed invalid YouTube gallery command from cached response")
 
                     cache_source = "client"
-                    # Increment client cache hit count
-                    client_cache.increment_hit_count(cleaned_message)
+                    # Increment client cache hit count (DISABLED)
+                    # client_cache.increment_hit_count(cleaned_message)
                 else:
                     print(f"🎯 Server cache HIT for: {cleaned_message[:50]}...")
                     response_buffer = server_cached_response["response"]
@@ -312,6 +394,32 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                 print(
                     f"🎯 Broadcasting cached response: {response_buffer[:100]}...")
 
+                # Get the model that was used to generate this cached response
+                cached_model = "unknown"
+                if cache_source == "client":
+                    # For client cache, we need to get the model from the cache entry (DISABLED)
+                    # cached_entry = client_cache.get_cached_response(
+                    #     cleaned_message)
+                    # if cached_entry:
+                    #     cached_model = cached_entry.get(
+                    #         "model", "portfolio_assistant")
+                    cached_model = "portfolio_assistant"  # Default since client cache is disabled
+                else:
+                    # For server cache, get the model from the cache data
+                    try:
+                        from server.cache.routes import load_cache_data
+                        cache_data = load_cache_data()
+                        if cleaned_message in cache_data:
+                            cached_model = cache_data[cleaned_message].get(
+                                "model", "unknown")
+                    except Exception as e:
+                        print(f"❌ Error getting cached model: {e}")
+
+                # Track the last response given to this user
+                last_response_key = f"last_response_{username}"
+                setattr(manager, last_response_key, response_buffer)
+                print(f"📝 Tracked response for {username}")
+
                 # Send cached response as a complete bot message with proper styling and TTS
                 await manager.broadcast(json.dumps({
                     "event": "bot_message_stream",
@@ -323,7 +431,8 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         "full_message": response_buffer,
                         "voice_b64": voice_b64,
                         "cached": True,
-                        "cache_source": cache_source
+                        "cache_source": cache_source,
+                        "cached_model": cached_model
                     }
                 }))
 
@@ -332,7 +441,13 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
             else:
                 if should_bypass_cache:
                     print(
-                        f"🔄 Bypassing cache for YouTube gallery query: {cleaned_message[:50]}...")
+                        f"🔄 Bypassing cache for query: {cleaned_message[:50]}...")
+                    if "[REGENERATE]" in message:
+                        print(f"🔄 Reason: Regenerate flag detected")
+                    elif would_be_duplicate:
+                        print(f"🔄 Reason: Duplicate response prevention")
+                    else:
+                        print(f"🔄 Reason: Other bypass condition")
                 else:
                     print(
                         f"❌ Client cache MISS for: {cleaned_message[:50]}...")
@@ -346,7 +461,11 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                     total_chunks = 0
                     estimated_total_chunks = 50  # Rough estimate for progress calculation
 
-                    for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username):
+                    print(
+                        f"🔄 Starting fresh response generation with bypass_predefined={should_bypass_cache}")
+                    print(f"🔄 Query: '{cleaned_message}'")
+
+                    for chunk in bot.portfolio_assistant.get_response_stream(cleaned_message, username, bypass_predefined=should_bypass_cache):
                         if chunk:
                             # Check if this is a status marker
                             if chunk.startswith("[STATUS|"):
@@ -421,13 +540,19 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
 
                     print(
                         f"✅ Bot response generation completed, length: {len(response_buffer)}")
-                    # Cache the response for future use
-                    client_cache.cache_response(
-                        question=cleaned_message,
-                        response=response_buffer,
-                        model="portfolio_assistant",
-                        user_id=username
-                    )
+
+                    # Track the last response given to this user
+                    last_response_key = f"last_response_{username}"
+                    setattr(manager, last_response_key, response_buffer)
+                    print(f"📝 Tracked fresh response for {username}")
+
+                    # Cache the response for future use (DISABLED)
+                    # client_cache.cache_response(
+                    #     question=cleaned_message,
+                    #     response=response_buffer,
+                    #     model="portfolio_assistant",
+                    #     user_id=username
+                    # )
 
                     # save the response to db
                     bot.portfolio_assistant.save_response(
@@ -443,6 +568,11 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                             if chunk and not chunk.startswith("[PROGRESS|") and not chunk.startswith("[STATUS|"):
                                 fallback_response += chunk
 
+                        # Track the fallback response
+                        last_response_key = f"last_response_{username}"
+                        setattr(manager, last_response_key, fallback_response)
+                        print(f"📝 Tracked fallback response for {username}")
+
                         await manager.broadcast(json.dumps({
                             "event": "chat_message",
                             "data": {
@@ -452,22 +582,36 @@ async def _handle_bot_public_response(bot, username: str, message: str, manager:
                         }))
                     except Exception as fallback_error:
                         print(f"❌ Fallback also failed: {fallback_error}")
+                        # Track the error fallback response
+                        error_message = "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+                        last_response_key = f"last_response_{username}"
+                        setattr(manager, last_response_key, error_message)
+                        print(
+                            f"📝 Tracked error fallback response for {username}")
+
                         await manager.broadcast(json.dumps({
                             "event": "chat_message",
                             "data": {
                                 "user": bot.username,
-                                "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+                                "message": error_message
                             }
                         }))
 
         except Exception as e:
             print(f"❌ Error generating bot response: {e}")
             # Send a fallback response
+            error_message = "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+
+            # Track the error response
+            last_response_key = f"last_response_{username}"
+            setattr(manager, last_response_key, error_message)
+            print(f"📝 Tracked main error response for {username}")
+
             await manager.broadcast(json.dumps({
                 "event": "chat_message",
                 "data": {
                     "user": bot.username,
-                    "message": "I'm having trouble processing that right now. Feel free to ask me about projects, skills, or development experience!"
+                    "message": error_message
                 }
             }))
 

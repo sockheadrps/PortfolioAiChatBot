@@ -137,5 +137,5 @@ class ClientCache:
         return False
 
 
-# Global client cache instance
-client_cache = ClientCache()
+# Global client cache instance (DISABLED)
+# client_cache = ClientCache()

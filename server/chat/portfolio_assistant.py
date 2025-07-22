@@ -14,19 +14,6 @@ from server.db.db import SessionLocal
 from server.db.dbmodels import ChatHistory
 import time
 
-# ========== CONFIGURATION ==========
-# WebSocket Endpoints - Configure your chat connections here
-WEBSOCKET_CONFIG = {
-    # Local development
-    "LOCAL_WS_URL": "ws://localhost:8080/ws",
-
-    # Production
-    "PRODUCTION_WS_URL": "wss://chat.socksthoughtshop.lol/ws",
-
-    # Current active URL (should match frontend)
-    # "ACTIVE_WS_URL": "ws://localhost:8080/ws"
-    "ACTIVE_WS_URL": "wss://chat.socksthoughtshop.lol/ws"
-}
 
 # Ollama Configuration - Customize your AI model settings here
 OLLAMA_CONFIG = {
@@ -34,8 +21,8 @@ OLLAMA_CONFIG = {
     "API_URL": "http://localhost:11434/api/generate",
 
     # Model name (options: mistral, tinyllama, llama2, llama3:latest, llama3.2:latest, etc.)
-    "MODEL": "llama3.2:latest",
     # "MODEL": "llama3.2:latest",
+    "MODEL": "llama3.2:latest",
     # "MODEL": "gemma3:12b",
     # "MODEL": "tinyllama:latest",
 
@@ -52,19 +39,19 @@ PROMPT_CONFIG = {
     "CURRENT_STYLE": "default",
 
     "STYLES": {
-        "default": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience. You may also answer questions that are just general inquiries about Ryan's life, and who he is, and how he got to where he is today.
+        "default": """You are Ryan's personal portfolio assistant. You answer questions about Ryan's professional work, projects, skills, and technical experience. You may also answer questions that are just general inquiries about Ryan's life, and who he is, and how he got to where he is today.
 
 
 BACKGROUND: Ryan is primarily an electrician by trade with extensive electrical engineering experience. His software projects are passion and personal projects, not his main profession. When discussing his work skills and work experience, prioritize his electrical work as his primary professional background.
 
-IMPORTANT: Only respond to questions about:
-- Programming/software projects (Python, JavaScript, FastAPI, etc.)
+IMPORTANT: You may respond to whatever you want, but respond with facts in these domains:
+- Programming/software projects (Python, JavaScript, FastAPI, etc.) and all associated libraries and technologies.
 - Electrical engineering work (QA, manufacturing, AIDA press projects, TEGG work)
 - Hardware/hobby projects (PCBs, electronics, guitars, etc.)
 - Technical skills and professional experience
-- Development tools, technologies, and methodologies used
+- Development tools, technologies, libraries and methodologies used
 
-For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics.
+For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics. You may make loose connections to questions but make sure you bring the conversation back with the data about Ryan and his skills, work, experience, etc.
 
 RESPONSE STYLE: Be engaging, detailed, and interesting. Tell stories about the projects, explain the technical challenges, highlight unique aspects, and make the responses feel personal and compelling. Use specific details from the context to paint a vivid picture of Ryan's work and skills. Don't just list facts - explain the impact he had, the problem-solving approach he took, and what makes each project special. Keep responses concise and focused - aim for 150-250 words maximum to maintain engagement and clarity.
 
@@ -80,20 +67,27 @@ For software/programming projects, include any available GitHub links if present
 
     Answer this: {query}
 """,
-        "llama3.2": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience.
+        "llama3.2": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, youtube, projects, skills, and technical experience.
 
 IMPORTANT: Only respond to questions about:
 - Programming/software projects (Python, JavaScript, FastAPI, etc.)
 - Electrical engineering work (QA, manufacturing, AIDA press projects, TEGG work)
 - Hardware/hobby projects (PCBs, electronics, guitars, etc.)
 - Technical skills and professional experience
-- Development tools, technologies, and methodologies used
+- Development tools, technologies, libraries and methodologies used
 
-For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics.
 
-For software/programming projects, include any available GitHub links if present in the context. For electrical, manufacturing, or hardware projects, focus on the technical skills and experience rather than code repositories. Dont send youtube links though.
+For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics. You may make loose connections to questions but make sure you bring the conversation back with the data about Ryan and his skills, work, experience, etc.
 
-Use ONLY the facts provided in the context below. Do not make up information.
+RESPONSE STYLE: Be engaging, detailed, and interesting. Tell stories about the projects, explain the technical challenges, highlight unique aspects, and make the responses feel personal and compelling. Use specific details from the context to paint a vivid picture of Ryan's work and skills. Don't just list facts - explain the impact he had, the problem-solving approach he took, and what makes each project special. Keep responses concise and focused - aim for 150-250 words maximum to maintain engagement and clarity.
+
+CRITICAL: Use ONLY the facts and details provided in the context. Do not invent specific stories, locations, or scenarios that aren't explicitly mentioned. If the context mentions general environments (like "hospitals"), don't create specific stories about individual cases unless they're explicitly detailed in the context.
+
+FORMATTING: Use plain text only - no markdown formatting, no asterisks, no bold text. Write in a natural, conversational style that flows well in a chat interface.
+
+For software/programming projects, include any available GitHub links if present in the context. For electrical, manufacturing, or hardware projects, focus on the technical skills and experience rather than code repositories.
+
+
 
     Context:
     {context}
@@ -135,6 +129,7 @@ class PortfolioAssistant:
         try:
             print("🤖 Initializing Optimized Portfolio Assistant...")
             self._load_projects()
+            self._load_repo_data()
 
             # Only initialize if we have projects
             if self.projects:
@@ -215,10 +210,104 @@ class PortfolioAssistant:
             if proj.get("type") == "professional_story" and proj.get("youtube_tutorials"):
                 print(
                     f"[DEBUG] Testing YouTube gallery for: {proj.get('title', 'Professional Story')}")
+
+    def _load_repo_data(self):
+        """Load repository analysis data for programming-related queries."""
+        try:
+            repo_data_path = "analysis_report.json"
+            if os.path.exists(repo_data_path):
+                with open(repo_data_path, 'r', encoding='utf-8') as f:
+                    self.repo_data = json.load(f)
+                print(f"✅ Loaded repository analysis data")
+            else:
+                print(
+                    f"⚠️ Repository analysis data not found: {repo_data_path}")
+                self.repo_data = None
+        except Exception as e:
+            print(f"❌ Error loading repository data: {e}")
+            self.repo_data = None
+
+        # Test YouTube gallery command generation
+        for proj in self.projects:
+            if proj.get("type") == "professional_story" and proj.get("youtube_tutorials"):
+                print(
+                    f"[DEBUG] Testing YouTube gallery for: {proj.get('title', 'Professional Story')}")
                 test_command = self._create_youtube_gallery(
                     proj.get("youtube_tutorials"), proj.get("title", "Professional Story"))
                 print(f"[DEBUG] Test YouTube gallery command: {test_command}")
-                break
+
+    def _format_repo_data_for_context(self) -> str:
+        """Format repository analysis data for inclusion in programming-related queries."""
+        print(
+            f"[DEBUG] _format_repo_data_for_context - repo_data exists: {self.repo_data is not None}")
+        if not self.repo_data:
+            print(
+                f"[DEBUG] _format_repo_data_for_context - No repository data available")
+            return ""
+
+        try:
+            summary = self.repo_data.get("summary", {})
+            python_stats = self.repo_data.get("python_statistics", {})
+            constructs = self.repo_data.get("constructs", {})
+            libraries = self.repo_data.get("libraries", {})
+            file_extensions = self.repo_data.get("file_extensions", {})
+
+            # Get top libraries (most used)
+            top_libraries = sorted(
+                libraries.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            # Get top file extensions (programming languages)
+            programming_extensions = {k: v for k, v in file_extensions.items()
+                                      if k in ['.py', '.js', '.ts', '.java', '.rs', '.go', '.html', '.css', '.svelte']}
+            top_extensions = sorted(
+                programming_extensions.items(), key=lambda x: x[1], reverse=True)[:8]
+
+            # Format the repository data
+            repo_context = f"""
+Repository Analysis Data:
+- Total Repositories: {summary.get('total_repositories', 0)}
+- Repositories with Python: {python_stats.get('repos_with_python', 0)}
+- Total Python Files: {python_stats.get('total_python_files', 0)}
+- Total Python Lines: {python_stats.get('total_python_lines', 0)}
+- Total Commits: {summary.get('total_commits', 0)}
+
+Code Constructs:
+- Functions: {constructs.get('total_functions', 0)} (regular: {constructs.get('regular_functions', 0)}, async: {constructs.get('async_functions', 0)})
+- Loops: {constructs.get('total_loops', 0)} (for: {constructs.get('for_loops', 0)}, while: {constructs.get('while_loops', 0)})
+- Classes: {constructs.get('classes', 0)}
+- If Statements: {constructs.get('if_statements', 0)}
+
+Top Programming Languages/Technologies:
+{chr(10).join([f"- {ext}: {count} files" for ext, count in top_extensions])}
+
+Most Used Libraries:
+{chr(10).join([f"- {lib}: {count} times" for lib, count in top_libraries])}
+
+Most Active Repositories:
+{chr(10).join([f"- {repo}: {commits} commits" for repo, commits in summary.get('most_active_repos', [])[:5]])}
+"""
+            return repo_context.strip()
+        except Exception as e:
+            print(f"❌ Error formatting repo data: {e}")
+            return ""
+
+    def _is_programming_query(self, query: str) -> bool:
+        """Check if a query is programming-related and should show the programming report button."""
+        print(
+            f"🔍 Checking if query is programming-related: {query} CODE CODE CDOE")
+        if not query:
+            return False
+
+        programming_keywords = [
+            "programming", "code", "python", "javascript", "typescript", "java", "rust", "go",
+            "languages", "libraries", "frameworks", "github", "repositories", "development",
+            "software", "lines of code", "functions", "classes", "libraries", "commits",
+            "repositories", "projects", "coding", "developer", "programming experience",
+            "technical skills", "codebase", "codebase", "programming languages"
+        ]
+
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in programming_keywords)
 
     def list_hobby_projects(self) -> str:
         hobbies = [proj for proj in self.projects if proj.get(
@@ -792,11 +881,11 @@ class PortfolioAssistant:
                         if proj.get("youtube_tutorials"):
                             text += f"\nYouTube Tutorials: {', '.join(proj['youtube_tutorials'])}"
 
-                        # Add image if present
-                if proj.get("image"):
-                    text += f"\nImage: {proj['image']}"
+                    # Add image if present
+                    if proj.get("image"):
+                        text += f"\nImage: {proj['image']}"
 
-                corpus_texts.append(text.strip())
+                    corpus_texts.append(text.strip())
 
             # Debug: Check if corpus_texts and projects have the same length
             print(
@@ -1045,9 +1134,23 @@ class PortfolioAssistant:
             q_embedding_list = self._ensure_list_format([q_embedding])
             q_embedding = q_embedding_list[0] if q_embedding_list else []
 
+            # Check if collection has any documents
+            collection_count = self.collection.count()
+            print(f"[DEBUG] ChromaDB collection count: {collection_count}")
+
+            if collection_count == 0:
+                print(
+                    f"[DEBUG] ChromaDB collection is empty, returning empty results")
+                return []
+
+            # Ensure n_results is at least 1
+            n_results = max(1, min(top_k, collection_count))
+            print(
+                f"[DEBUG] Querying ChromaDB with n_results={n_results}, filter_type={filter_type}")
+
             results = self.collection.query(
                 query_embeddings=[q_embedding],
-                n_results=min(top_k, self.collection.count()),
+                n_results=n_results,
                 include=['documents', 'distances', 'metadatas'],
                 where={"type": filter_type} if filter_type else None
             )
@@ -1070,7 +1173,34 @@ class PortfolioAssistant:
 
         except Exception as e:
             print(f"❌ Error querying portfolio: {e}")
-            return []
+            print(f"[DEBUG] Falling back to returning all projects for context")
+            # Fallback: return all projects to ensure we have context for repository data
+            fallback_matches = []
+            for i, project in enumerate(self.projects):
+                if filter_type and project.get("type") != filter_type:
+                    continue
+
+                project_display_name = project.get(
+                    "name", project.get("title", f"Project {i}"))
+                text = f"""Project: {project_display_name}
+                    Description: {project.get('description', '')}
+                    Skills: {", ".join(project.get("skills", []))}
+                    Code URL: {project.get("code_url", "N/A")}
+                    Notes:
+                    - """ + "\n- ".join(project.get('notes', []))
+
+                fallback_matches.append({
+                    "text": text.strip(),
+                    "metadata": {
+                        "type": project.get("type", "software"),
+                        "name": project_display_name,
+                        "code_url": project.get("code_url", ""),
+                        "skills": ", ".join(project.get("skills", [])),
+                        "image": project.get("image", "")
+                    }
+                })
+
+            return fallback_matches[:top_k]
 
     def _find_direct_project_matches(self, question: str, filter_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Find projects by direct name matching and skill-based matching before falling back to semantic search."""
@@ -1116,8 +1246,9 @@ class PortfolioAssistant:
             print(f"[DEBUG] No LED horticulture project found in direct search")
 
         # Special handling for manufacturing queries - prioritize AIDA project
-        if "manufacturing" in question_lower and filter_type == "electrical":
+        if "manufacturing" in question_lower:
             print(f"[DEBUG] Looking for AIDA manufacturing project...")
+            print(f"[DEBUG] Filter type: {filter_type}")
             for i, project in enumerate(self.projects):
                 print(
                     f"[DEBUG] Checking project {i}: {project.get('name', 'Unknown')} (type: {project.get('type', 'Unknown')})")
@@ -1146,6 +1277,38 @@ class PortfolioAssistant:
                         }
                     }]
             print(f"[DEBUG] No AIDA manufacturing project found in direct search")
+
+            # Fallback: Look for any electrical projects with manufacturing skills
+            print(
+                f"[DEBUG] Looking for any electrical projects with manufacturing skills...")
+            manufacturing_projects = []
+            for i, project in enumerate(self.projects):
+                if (project.get("type") == "electrical" and
+                        any("manufacturing" in skill.lower() for skill in project.get("skills", []))):
+                    manufacturing_projects.append(project)
+                    print(
+                        f"[DEBUG] Found manufacturing project: {project['name']}")
+
+            if manufacturing_projects:
+                # Return the first manufacturing project found
+                project = manufacturing_projects[0]
+                text = f"""Project: {project['name']}
+                    Description: {project['description']}
+                    Skills: {", ".join(project.get("skills", []))}
+                    Code URL: {project.get("code_url", "N/A")}
+                    Notes:
+                    - """ + "\n- ".join(project.get('notes', []))
+
+                return [{
+                    "text": text.strip(),
+                    "metadata": {
+                        "type": project.get("type", "electrical"),
+                        "name": project.get("name", f"Project {i}"),
+                        "code_url": project.get("code_url", ""),
+                        "skills": ", ".join(project.get("skills", [])),
+                        "image": project.get("image", "")
+                    }
+                }]
 
         # Special handling for professional profile queries
         if any(word in question_lower for word in ["professional", "profile", "background", "experience", "career", "resume", "cv", "about you", "your background"]):
@@ -1221,6 +1384,43 @@ class PortfolioAssistant:
                     }]
             print(f"[DEBUG] No professional story found in direct search")
 
+        # Special handling for YouTube queries - prioritize professional story
+        if any(word in question_lower for word in ["youtube", "video", "tutorial", "stream", "twitch", "reddit", "content"]):
+            print(f"[DEBUG] Looking for YouTube/content projects...")
+            for i, project in enumerate(self.projects):
+                if project.get("type") == "professional_story" and project.get("youtube_tutorials"):
+                    print(
+                        f"[DEBUG] Found professional story with YouTube tutorials: {project.get('title', 'Professional Story')}")
+                    # Create the same format as ChromaDB results for professional story
+                    text = f"""Project: {project.get('title', 'Professional Story')}
+                        Intro: {project.get('intro', '')}
+                        """
+
+                    # Add sections
+                    for section in project.get("sections", []):
+                        text += f"\n{section.get('heading', '')}:"
+                        for content in section.get("content", []):
+                            text += f"\n{content}"
+                        for bullet in section.get("bullets", []):
+                            text += f"\n- {bullet}"
+
+                    # Add YouTube tutorials if available
+                    if project.get("youtube_tutorials"):
+                        text += f"\nYouTube Tutorials: {', '.join(project['youtube_tutorials'])}"
+
+                    return [{
+                        "text": text.strip(),
+                        "metadata": {
+                            "type": project.get("type", "professional_story"),
+                            "name": project.get("title", f"Professional Story {i}"),
+                            "code_url": "",
+                            "skills": "",
+                            "image": "",
+                            "youtube_tutorials": ", ".join(project.get("youtube_tutorials", []))
+                        }
+                    }]
+            print(f"[DEBUG] No YouTube projects found in direct search")
+
         # Remove common query words to extract project name
         query_words = ["what", "is", "tell", "me",
                        "about", "@bot", "whats", "what's"]
@@ -1234,7 +1434,9 @@ class PortfolioAssistant:
             if filter_type and project.get("type") != filter_type:
                 continue
 
-            project_name = project["name"].lower()
+            # Handle different project formats (some use 'name', others use 'title')
+            project_name = project.get(
+                "name", project.get("title", f"Project {i}")).lower()
 
             # Check if the cleaned question matches the project name (full or partial)
             if (question_lower in project_name or
@@ -1243,8 +1445,10 @@ class PortfolioAssistant:
                     any(word in project_name for word in question_lower.split() if len(word) > 3)):  # Significant words
 
                 # Create the same format as ChromaDB results
-                text = f"""Project: {project['name']}
-                    Description: {project['description']}
+                project_display_name = project.get(
+                    "name", project.get("title", f"Project {i}"))
+                text = f"""Project: {project_display_name}
+                    Description: {project.get('description', '')}
                     Skills: {", ".join(project.get("skills", []))}
                     Code URL: {project.get("code_url", "N/A")}
                     Notes:
@@ -1256,7 +1460,7 @@ class PortfolioAssistant:
                     "text": text.strip(),
                     "metadata": {
                         "type": project.get("type", "software"),
-                        "name": project.get("name", f"Project {i}"),
+                        "name": project_display_name,
                         "code_url": project.get("code_url", ""),
                         "skills": ", ".join(project.get("skills", [])),
                         "image": project.get("image", "")
@@ -1270,20 +1474,32 @@ class PortfolioAssistant:
         query: str,
         matches: List[dict],
         user_id: str = "default",
-        filter_type: Optional[str] = None
+        filter_type: Optional[str] = None,
+        is_regenerate: bool = False
     ) -> Iterator[str]:
-        """Generate a streaming response using Ollama HTTP API with project context."""
+        """Generate a streaming response
+          using Ollama HTTP API with project context."""
         print(f"[📤] Prompt → Ollama model {OLLAMA_CONFIG['MODEL']}")
 
         if not matches:
             yield self._get_fallback_response(query)
             return
 
+        print(f"[DEBUG] Query: '{query}'")
+        print(f"[DEBUG] Found {len(matches)} matches")
+        for i, match in enumerate(matches):
+            meta = match.get("metadata", {})
+            print(
+                f"[DEBUG] Match {i}: {meta.get('name', 'Unknown')} (type: {meta.get('type', 'unknown')})")
+            print(f"[DEBUG]   - Image: '{meta.get('image', 'None')}'")
+            print(
+                f"[DEBUG]   - YouTube: '{meta.get('youtube_tutorials', 'None')}'")
+
         projects_with_images = self._extract_project_images(matches, top_n=2)
         if projects_with_images:
             self.current_project_images = projects_with_images
 
-        context = self._build_context(matches)
+        context = self._build_context(matches, query)
         prompt = self._format_prompt(context, query)
 
         yield "[STATUS|Passing data to LLM...]"
@@ -1297,15 +1513,25 @@ class PortfolioAssistant:
             )
         except (requests.ConnectionError, requests.Timeout) as e:
             print(f"❌ Ollama request failed: {e}")
-            yield self._get_simple_response(matches, query)
+            if is_regenerate:
+                print(
+                    f"🔄 Regenerate fallback: Providing alternative response for: {query}")
+                yield self._get_alternative_response(matches, query)
+            else:
+                print(f"🔄 Falling back to simple response for: {query}")
+                yield self._get_simple_response(matches, query)
             return
 
         if response.status_code != 200:
             print(f"❌ Ollama HTTP {response.status_code}")
-            yield self._get_simple_response(matches, query)
+            if is_regenerate:
+                print(
+                    f"🔄 Regenerate fallback: Providing alternative response for: {query}")
+                yield self._get_alternative_response(matches, query)
+            else:
+                print(f"🔄 Falling back to simple response for: {query}")
+                yield self._get_simple_response(matches, query)
             return
-
-            yield "[STATUS|Generating response...]"
 
         # Stream the response and collect the full text simultaneously
         full_response = ""
@@ -1316,18 +1542,36 @@ class PortfolioAssistant:
             yield chunk
 
         # Append image‑gallery button only if we have actual images
+        print(f"[DEBUG] projects_with_images: {projects_with_images}")
         if projects_with_images and len(projects_with_images) > 0:
             # Double-check that we have valid image paths
             valid_images = [
                 img for img in projects_with_images if img.get("image", "").strip()]
+            print(f"[DEBUG] valid_images after filtering: {valid_images}")
             if valid_images:
+                print(
+                    f"[DEBUG] Adding image gallery button with {len(valid_images)} images")
                 yield "\n\n[BUTTON|view_project_images|View Images]"
+            else:
+                print(
+                    f"[DEBUG] No valid images found, skipping image gallery button")
+        else:
+            print(f"[DEBUG] No projects_with_images found")
 
         # Insert YouTube gallery if applicable
+        print(
+            f"[DEBUG] Calling _maybe_append_youtube_gallery with query: '{query}'")
         youtube_added = self._maybe_append_youtube_gallery(
-            matches, full_response)
+            matches, full_response, query)
         if youtube_added:
+            print(f"[DEBUG] Adding YouTube gallery: {youtube_added}")
             yield f"\n\n{youtube_added}"
+        else:
+            print(f"[DEBUG] No YouTube gallery to add")
+
+        # Add programming report button for programming-related queries
+        if self._is_programming_query(query):
+            yield "\n\n[BUTTON|show_programming_report|View Detailed Programming Report]"
 
         # Finally save the response
         self.save_query_and_response(query, full_response, user_id)
@@ -1336,27 +1580,99 @@ class PortfolioAssistant:
 
     def _extract_project_images(self, matches: List[dict], top_n: int) -> List[dict]:
         imgs = []
-        for m in matches[:top_n]:
-            img = m["metadata"].get("image", "").strip()
-            if img:
-                imgs.append({
-                    "name": m["metadata"].get("name", "Project"),
-                    "image": img
-                })
+        print(f"[DEBUG] Extracting project images from {len(matches)} matches")
+        for i, m in enumerate(matches[:top_n]):
+            try:
+                metadata = m.get("metadata", {})
+                if not metadata:
+                    print(
+                        f"⚠️ Warning: No metadata found in match {i}, skipping image extraction")
+                    continue
+
+                img = metadata.get("image", "").strip()
+                project_name = metadata.get("name", "Project")
+                print(
+                    f"[DEBUG] Match {i} - Project: {project_name}, Image: '{img}'")
+
+                if img and img != "N/A" and img != "":
+                    # Check if the image file actually exists
+                    import os
+                    static_dir = "server/static"
+                    image_path = os.path.join(static_dir, img.lstrip("/"))
+
+                    if os.path.exists(image_path) or os.path.exists(image_path + ".jpg") or os.path.exists(image_path + ".png") or os.path.exists(image_path + ".jpeg"):
+                        imgs.append({
+                            "name": project_name,
+                            "image": img
+                        })
+                        print(
+                            f"[DEBUG] Added valid image for {project_name}: {img}")
+                    else:
+                        print(
+                            f"[DEBUG] Image file does not exist: {image_path}")
+                else:
+                    print(f"[DEBUG] No valid image found for {project_name}")
+            except Exception as e:
+                print(f"❌ Error extracting project image: {e}")
+                continue
+        print(f"[DEBUG] Extracted {len(imgs)} valid images")
         return imgs
 
-    def _build_context(self, matches: List[dict]) -> str:
+    def _build_context(self, matches: List[dict], query: str = "") -> str:
         parts = []
         for m in matches:
-            md = m["metadata"]
-            lines = [f"Project: {md.get('name', 'Project')}"]
-            lines.append(m["text"])
-            if md.get("type") == "software" and md.get("code_url"):
-                lines.append(f"GitHub: {md['code_url']}")
-            if md.get("type") in ("professional", "professional_story") and md.get("youtube_tutorials"):
-                lines.append(f"YouTube Tutorials: {md['youtube_tutorials']}")
-            parts.append("\n".join(lines))
-        return "\n---\n".join(parts)
+            try:
+                md = m.get("metadata", {})
+                if not md:
+                    # Instead of skipping, use a default structure
+                    lines = ["Project: Unknown Project"]
+                    lines.append(m.get("text", ""))
+                    parts.append("\n".join(lines))
+                    continue
+
+                lines = [f"Project: {md.get('name', 'Project')}"]
+                lines.append(m.get("text", ""))
+                if md.get("type") == "software" and md.get("code_url"):
+                    lines.append(f"GitHub: {md['code_url']}")
+                if md.get("type") in ("professional", "professional_story") and md.get("youtube_tutorials"):
+                    lines.append(
+                        f"YouTube Tutorials: {md['youtube_tutorials']}")
+                parts.append("\n".join(lines))
+            except Exception as e:
+                print(f"❌ Error building context for match: {e}")
+                # Try to salvage what we can from the match
+                try:
+                    lines = ["Project: Unknown Project"]
+                    lines.append(m.get("text", ""))
+                    parts.append("\n".join(lines))
+                except:
+                    continue
+
+        context = "\n---\n".join(parts)
+
+        # Add repository data for programming-related queries
+        programming_keywords = ["programming", "code", "python", "javascript",
+                                "languages", "libraries", "repositories", "github", "development", "software"]
+        matching_keywords = [
+            keyword for keyword in programming_keywords if keyword in query.lower()]
+        print(f"[DEBUG] _build_context - Query: '{query}'")
+        print(
+            f"[DEBUG] _build_context - Matching programming keywords: {matching_keywords}")
+
+        if query and matching_keywords:
+            print(
+                f"[DEBUG] _build_context - Adding repository data for programming query")
+            repo_context = self._format_repo_data_for_context()
+            if repo_context:
+                print(f"[DEBUG] _build_context - Repository data added to context")
+                context += f"\n\n{repo_context}"
+            else:
+                print(f"[DEBUG] _build_context - No repository data available")
+        else:
+            print(
+                f"[DEBUG] _build_context - Not a programming query, skipping repository data")
+
+        return context
 
     def _format_prompt(self, context: str, query: str) -> str:
         style = PROMPT_CONFIG["CURRENT_STYLE"]
@@ -1409,13 +1725,59 @@ class PortfolioAssistant:
 
         return full_text
 
-    def _maybe_append_youtube_gallery(self, matches: List[dict], full_text: str) -> Optional[str]:
+    def _maybe_append_youtube_gallery(self, matches: List[dict], full_text: str, query: str = "") -> Optional[str]:
+        print(
+            f"[DEBUG] _maybe_append_youtube_gallery called with query: '{query}'")
+        print(f"[DEBUG] Checking {len(matches)} matches for YouTube content")
         for m in matches:
             if m["metadata"].get("type") in ("professional", "professional_story"):
                 vids = m["metadata"].get("youtube_tutorials", "")
-                urls = [u.strip() for u in vids.split(",") if u.strip()]
-                if urls:
-                    return self._create_youtube_gallery(urls, m["metadata"].get("name", "Project"))
+                if vids and vids.strip():  # Check if youtube_tutorials exists and is not empty
+                    urls = [u.strip() for u in vids.split(",") if u.strip()]
+                    if urls:  # Only proceed if we have valid URLs
+                        print(f"[DEBUG] Found YouTube tutorials: {urls}")
+                        # Only show YouTube gallery for general professional queries, not for specific technical questions
+                        project_name = m["metadata"].get("name", "Project")
+
+                        # Check if this is a general professional query vs a specific technical question
+                        specific_technical_keywords = [
+                            "electrical", "qa", "quality", "manufacturing", "datacenter",
+                            "power", "ats", "inverter", "generator", "servo", "press",
+                            "excel", "tracker", "audit", "construction", "powersystem"
+                        ]
+
+                        is_specific_technical = any(
+                            keyword in query.lower() for keyword in specific_technical_keywords)
+
+                        print(f"[DEBUG] Query: '{query}'")
+                        print(
+                            f"[DEBUG] Specific technical keywords found: {[kw for kw in specific_technical_keywords if kw in query.lower()]}")
+                        print(
+                            f"[DEBUG] is_specific_technical: {is_specific_technical}")
+
+                        # Show YouTube gallery for general queries (including fun/hobby queries) that mention tutorials
+                        fun_hobby_keywords = [
+                            "fun", "hobby", "hobbies", "enjoy", "passion", "interest", "what does", "whats"]
+                        is_fun_hobby_query = any(
+                            keyword in query.lower() for keyword in fun_hobby_keywords)
+
+                        if is_specific_technical:
+                            print(
+                                f"[DEBUG] Skipping YouTube gallery for specific technical query: '{query}'")
+                        elif is_fun_hobby_query:
+                            print(
+                                f"[DEBUG] Adding YouTube gallery for fun/hobby query: '{query}'")
+                            return self._create_youtube_gallery(urls, project_name)
+                        else:
+                            print(
+                                f"[DEBUG] Adding YouTube gallery for general professional query: '{query}'")
+                            return self._create_youtube_gallery(urls, project_name)
+                    else:
+                        print(
+                            f"[DEBUG] No valid YouTube URLs found in: {vids}")
+                else:
+                    print(f"[DEBUG] No YouTube tutorials found in metadata")
+        print(f"[DEBUG] No YouTube gallery created for any matches")
         return None
 
     def _get_simple_response(self, matches: List[Dict[str, Any]], query: str) -> str:
@@ -1505,6 +1867,30 @@ class PortfolioAssistant:
             response += "\n\n[BUTTON|view_project_images|View Images]"
 
         return response
+
+    def _get_alternative_response(self, matches: List[Dict[str, Any]], query: str) -> str:
+        """Provide an alternative response when regenerating to avoid duplicates."""
+        if not matches:
+            return self._get_fallback_response(query)
+
+        # For regenerate requests, provide a different perspective or format
+        match = matches[0]
+        meta = match.get("metadata", {})
+        project_name = meta.get("name", "a project")
+        project_type = meta.get("type", "software")
+        skills = meta.get("skills", "").split(", ")[:3]
+
+        # Create an alternative response format
+        if project_type == "electrical":
+            if "qa" in query.lower() or "quality" in query.lower():
+                return f"Absolutely! Ryan's electrical QA experience is quite extensive. He's worked on {project_name}, where he applied {', '.join(skills)}. His approach to quality assurance involves systematic documentation, thorough testing protocols, and ensuring compliance with industry standards. This experience has given him a deep understanding of electrical systems and the importance of maintaining high quality standards in critical infrastructure."
+            elif "manufacturing" in query.lower():
+                return f"Ryan has significant manufacturing experience through his work on {project_name}. This involved {', '.join(skills)}, working with heavy machinery and industrial systems. His manufacturing background includes both assembly and retrofit work, giving him hands-on experience with production environments and the technical challenges of industrial automation."
+            else:
+                return f"Ryan's electrical work on {project_name} demonstrates his expertise in {', '.join(skills)}. This project showcases his ability to handle complex electrical systems and his attention to detail in ensuring reliable operation. His experience spans both installation and maintenance of critical electrical infrastructure."
+        else:
+            # For other project types, provide a different perspective
+            return f"Looking at Ryan's work on {project_name}, he demonstrated proficiency in {', '.join(skills)}. This project highlights his technical capabilities and his ability to deliver results in challenging environments. His experience shows a strong foundation in both theoretical knowledge and practical application."
 
     def _get_fallback_response(self, query: str) -> str:
         """Provide fallback response when no relevant projects found."""
@@ -1634,7 +2020,7 @@ class PortfolioAssistant:
 
             if not full_response.strip():
                 print(f"[DEBUG] Empty response, using fallback")
-            return self._get_fallback_response(query)
+                return self._get_fallback_response(query)
 
             return full_response
 
@@ -1644,10 +2030,11 @@ class PortfolioAssistant:
             traceback.print_exc()
             return self._get_fallback_response(query)
 
-    def get_response_stream(self, query: str, user_id: str = "default") -> Iterator[str]:
+    def get_response_stream(self, query: str, user_id: str = "default", bypass_predefined: bool = False) -> Iterator[str]:
         """Main optimized method to get a streaming response to a query, with hobby handling."""
         print(
             f"[DEBUG] get_response_stream called with query: '{query}' for user: {user_id}")
+        print(f"[DEBUG] bypass_predefined: {bypass_predefined}")
 
         # Check for button clicks first
         button_result = self.handle_button_click(query, user_id)
@@ -1704,7 +2091,8 @@ class PortfolioAssistant:
             return
 
         # Intercept software/project list questions and respond with predefined text
-        if any(kw in query.lower() for kw in [
+        # BUT skip predefined response if bypass_predefined is True
+        if not bypass_predefined and any(kw in query.lower() for kw in [
             "programming projects", "software projects", "code projects", "python projects",
             "what projects has he built", "list his projects", "developer projects",
             "programming languages", "languages", "what languages", "programming language"
@@ -1713,9 +2101,20 @@ class PortfolioAssistant:
                 f"[DEBUG] Software project keywords detected, using predefined response")
             yield from self._predefined_software_projects()
             return
+        elif bypass_predefined and any(kw in query.lower() for kw in [
+            "programming projects", "software projects", "code projects", "python projects",
+            "what projects has he built", "list his projects", "developer projects",
+            "programming languages", "languages", "what languages", "programming language"
+        ]):
+            print(
+                f"[DEBUG] Software project keywords detected but bypass_predefined=True, skipping predefined response")
 
         # Check if the query is portfolio-related before processing
-        if not self.is_portfolio_related(query):
+        print(f"[DEBUG] Checking if query is portfolio-related: '{query}'")
+        is_portfolio = self.is_portfolio_related(query)
+        print(f"[DEBUG] Query portfolio-related: {is_portfolio}")
+
+        if not is_portfolio:
             print(f"[DEBUG] Query not portfolio-related, using off-topic response")
             yield self._get_off_topic_response(query)
             return
@@ -1742,12 +2141,32 @@ class PortfolioAssistant:
                 f"[DEBUG] Found {len(matches)} matches for '{query}' (filter={filter_type}, top_k={top_k})")
             print(
                 f"[DEBUG] Project names: {[m.get('metadata', {}).get('name', 'Unknown') for m in matches]}")
-            yield from self.ask_ollama_stream(query, matches, user_id, filter_type)
+
+            # Check if this is a regenerate request
+            is_regenerate = "[REGENERATE]" in query
+
+            # Clear cache for programming-related queries that might have been incorrectly cached
+            if self._is_programming_query(query) and not is_regenerate:
+                print(f"[DEBUG] Programming query detected, checking cache...")
+                # The cache bypass logic in routes.py should handle this, but we can add extra logging here
+
+            yield from self.ask_ollama_stream(query, matches, user_id, filter_type, is_regenerate)
         except Exception as e:
             print(f"❌ Error getting streaming response: {e}")
+            print(f"🔍 Query that failed: '{query}'")
+            print(f"🔍 Filter type: {filter_type}")
+            print(
+                f"🔍 Number of matches: {len(matches) if 'matches' in locals() else 'N/A'}")
             import traceback
             traceback.print_exc()
-            yield self._get_fallback_response(query)
+
+            # Try to provide a more specific fallback for manufacturing queries
+            if "manufacturing" in query.lower():
+                print(
+                    f"🔄 Providing manufacturing-specific fallback for: {query}")
+                yield "Ryan has significant manufacturing experience working with AIDA America on servo press assembly and retrofit projects. He worked on presses ranging from 200 to 4,000 metric tons, installing electrical systems, routing communication cables, and integrating modern PLCs and safety interlocks. This work involved both in-house manufacturing and on-site retrofitting in live production environments."
+            else:
+                yield self._get_fallback_response(query)
 
     def _predefined_software_projects(self) -> Iterator[str]:
         yield (
@@ -1766,6 +2185,7 @@ class PortfolioAssistant:
     def is_portfolio_related(self, question: str) -> bool:
         """Check if a question is related to portfolio topics (projects, skills, experience)."""
         q = question.lower()
+        print(f"[DEBUG] is_portfolio_related checking: '{q}'")
 
         # Portfolio-related keywords
         portfolio_keywords = [
@@ -1775,7 +2195,7 @@ class PortfolioAssistant:
 
             # Programming/Software
             "programming", "software", "python", "javascript", "code", "coding", "github", "api", "websocket",
-            "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "app", "application",
+            "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "libraries", "app", "application",
             "development", "web", "fullstack", "framework", "database", "algorithm", "nlp", "machine learning",
             "tensorflow", "keras", "rust", "pydantic", "jwt", "authentication", "encryption",
 
@@ -1791,22 +2211,40 @@ class PortfolioAssistant:
 
             # Technical skills
             "technical", "engineering", "architect", "design", "implementation", "testing", "debugging",
-            "optimization", "performance", "security", "scalability"
+            "optimization", "performance", "security", "scalability",
+
+            # Personal/Life questions
+            "fun", "hobby", "hobbies", "personal", "life", "about", "who", "what", "how", "when", "where", "why",
+            "story", "journey", "background", "experience", "interests", "passion", "enjoy", "like", "love",
+
+            # Content creation and sharing
+            "youtube", "video", "tutorial", "tutorials", "content", "stream", "streaming", "twitch", "reddit",
+            "mentor", "teaching", "sharing", "knowledge", "educational", "content creation"
         ]
 
         # Check if any portfolio keywords are present
-        if any(keyword in q for keyword in portfolio_keywords):
+        matching_keywords = [
+            keyword for keyword in portfolio_keywords if keyword in q]
+        if matching_keywords:
+            print(f"[DEBUG] Found portfolio keywords: {matching_keywords}")
             return True
 
         # Check for common question patterns about portfolio
         portfolio_patterns = [
             "what did", "what have", "tell me about", "show me", "can you", "how did", "what projects",
-            "what work", "what experience", "what skills", "what technologies", "what tools"
+            "what work", "what experience", "what skills", "what technologies", "what tools", "what libraries",
+            "what does", "what do", "whats", "what's", "who is", "who's", "how is", "how's", "when does",
+            "where does", "why does", "tell me", "show me", "can you tell", "do you know",
+            "does he", "does she", "do they", "does ryan", "does he do", "does he have"
         ]
 
-        if any(pattern in q for pattern in portfolio_patterns):
+        matching_patterns = [
+            pattern for pattern in portfolio_patterns if pattern in q]
+        if matching_patterns:
+            print(f"[DEBUG] Found portfolio patterns: {matching_patterns}")
             return True
 
+        print(f"[DEBUG] No portfolio keywords or patterns found")
         return False
 
     def infer_filter_type(self, question: str) -> Optional[str]:
@@ -1821,7 +2259,7 @@ class PortfolioAssistant:
         if any(word in q for word in ["electrical", "qa", "infrared", "tegg", "thermal", "ultrasonic", "power distribution", "voltage", "inspection"]):
             return "electrical"
 
-        if any(word in q for word in ["programming", "software", "python", "code", "github", "api", "websocket", "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "app", "application", "development"]):
+        if any(word in q for word in ["programming", "software", "python", "code", "github", "api", "websocket", "model", "fastapi", "plotly", "pyo3", "async", "chatbot", "frontend", "library", "libraries", "app", "application", "development"]):
             return "software"
         if any(word in q for word in ["hardware", "hobby", "hobbies", "pcb", "etching", "soldering", "prototyping", "embedded", "microcontroller", "midi", "ble", "rgb", "led", "strip", "guitar", "overlay", "effects", "musical", "interface", "design"]):
             return "hobby"

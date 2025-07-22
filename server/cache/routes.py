@@ -1,18 +1,39 @@
+from server.chat.portfolio_assistant import OLLAMA_CONFIG
+from dotenv import load_dotenv
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+import time
+import os
+import json
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from server.db.db import SessionLocal
 from server.auth.auth import get_user_by_username
 from server.chat.portfolio_assistant import PortfolioAssistant
-from server.cache.client_cache import client_cache
-import json
-import os
-import time
-from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel
-from dotenv import load_dotenv
-from server.chat.portfolio_assistant import OLLAMA_CONFIG
+# from server.cache.client_cache import client_cache  # DISABLED
+# Create dummy client_cache object since it's referenced in the code
+
+
+class DummyClientCache:
+    def get_cached_response(self, message):
+        return None
+
+    def increment_hit_count(self, message):
+        pass
+
+    def cache_response(self, **kwargs):
+        pass
+
+    def get_all_entries(self):
+        return []
+
+    def get_cache_stats(self):
+        return {"total_entries": 0, "total_hits": 0, "cache_file_size": 0, "cache_file_exists": False}
+
+
+client_cache = DummyClientCache()
 
 load_dotenv()
 
@@ -1042,4 +1063,3 @@ async def get_cache_admin_interface(request: Request):
             <p>Error loading cache admin interface: {str(e)}</p>
             <p>Please check the server logs for more details.</p>
         """)
- 

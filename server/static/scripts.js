@@ -2,8 +2,8 @@
 const WS_CONFIG = {
   LOCAL_WS_URL: `ws://${window.location.hostname}:8080/ws`,
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
-  ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
-  // ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
+  // ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
+  ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
   RECONNECT_DELAY: 1000, // Start with 1 second
   MAX_RECONNECT_DELAY: 30000, // Max 30 seconds
   PING_INTERVAL: 30000, // Send ping every 30 seconds
@@ -600,7 +600,8 @@ const socketHandlers = {
           if (lastBotMessage && !lastBotMessage.querySelector('.generated-timestamp')) {
             // Check if this is a cached response
             const isCached = data.cached === true;
-            addGeneratedTimestamp(lastBotMessage, currentResponseTTS, isCached);
+            const cachedModel = data.cached_model || null;
+            addGeneratedTimestamp(lastBotMessage, currentResponseTTS, isCached, cachedModel);
             // Reset TTS data after using it
             currentResponseTTS = null;
           }
@@ -4043,7 +4044,12 @@ function showToast(message, type = 'info', duration = 3000) {
 // Cache system removed - no more local storage caching
 
 // Add generated timestamp to a response (fresh or cached)
-async function addGeneratedTimestamp(messageElement, voiceB64 = null, isCached = false) {
+async function addGeneratedTimestamp(
+  messageElement,
+  voiceB64 = null,
+  isCached = false,
+  cachedModel = null
+) {
   // Create timestamp indicator
   const timestampIndicator = document.createElement('div');
   timestampIndicator.className = isCached ? 'cached-timestamp' : 'generated-timestamp';
@@ -4057,16 +4063,22 @@ async function addGeneratedTimestamp(messageElement, voiceB64 = null, isCached =
     hour12: true,
   });
 
-  // Get the current model from the server
+  // Get the model information
   let model = 'unknown';
-  try {
-    const response = await fetch('/cache/model-info');
-    const data = await response.json();
-    if (data.success && data.data?.model) {
-      model = data.data.model;
+  if (isCached && cachedModel) {
+    // Use the cached model if available
+    model = cachedModel;
+  } else {
+    // Get the current model from the server for fresh responses
+    try {
+      const response = await fetch('/cache/model-info');
+      const data = await response.json();
+      if (data.success && data.data?.model) {
+        model = data.data.model;
+      }
+    } catch (error) {
+      // Could not fetch model info
     }
-  } catch (error) {
-    // Could not fetch model info
   }
 
   // Create timestamp content
@@ -4090,20 +4102,34 @@ async function addGeneratedTimestamp(messageElement, voiceB64 = null, isCached =
       const messages = document.querySelectorAll('.message');
       const userMessages = Array.from(messages)
         .filter((msg) => msg.classList.contains('user'))
-        .slice(-5); // Last 5 user messages
+        .slice(-10); // Look at last 10 user messages to find the original question
 
       if (userMessages.length > 0) {
-        const lastUserMessage = userMessages[userMessages.length - 1];
-        const messageText = lastUserMessage.querySelector('.message-text');
-        if (messageText) {
-          const question = messageText.textContent.trim();
-          // Send the question again to generate a fresh response
+        // Find the most recent message that doesn't contain [REGENERATE] or double @bot
+        let originalQuestion = null;
+        for (let i = userMessages.length - 1; i >= 0; i--) {
+          const messageText = userMessages[i].querySelector('.message-text');
+          if (messageText) {
+            const content = messageText.textContent.trim();
+            // Skip messages that are regenerate attempts or have double @bot
+            if (!content.includes('[REGENERATE]') && !content.includes('@bot @bot')) {
+              originalQuestion = content;
+              break;
+            }
+          }
+        }
+
+        if (originalQuestion) {
+          // Remove @bot prefix if it exists to get the clean question
+          let question = originalQuestion.replace(/@bot\s*/i, '').trim();
+
+          // Send the question again with a regenerate flag to force cache bypass
           if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(
               JSON.stringify({
                 type: 'chat_message',
                 data: {
-                  message: '@bot ' + question,
+                  message: '@bot [REGENERATE] ' + question,
                   displayName: window.displayName || currentUsername,
                 },
               })
