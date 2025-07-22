@@ -4,6 +4,10 @@ const WS_CONFIG = {
   PRODUCTION_WS_URL: 'wss://chat.socksthoughtshop.lol/ws',
   ACTIVE_WS_URL: `ws://${window.location.hostname}:8080/ws`,
   // ACTIVE_WS_URL: `wss://chat.socksthoughtshop.lol/ws`,
+  RECONNECT_DELAY: 1000, // Start with 1 second
+  MAX_RECONNECT_DELAY: 30000, // Max 30 seconds
+  PING_INTERVAL: 30000, // Send ping every 30 seconds
+  PONG_TIMEOUT: 10000, // Wait 10 seconds for pong response
 };
 
 // State management
@@ -20,6 +24,14 @@ let audioPlaybackRate = 1.3; // Playback speed (0.5x to 2.0x)
 let currentAudio = null; // Currently playing audio element
 let userHasInteracted = false; // Track if user has interacted (required for iOS audio)
 let pendingAudio = null; // Audio waiting to be played after user interaction
+
+// WebSocket connection management
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+let pingTimer = null;
+let pongTimer = null;
+let isReconnecting = false;
+let lastPongTime = Date.now();
 
 // Background settings
 const backgroundSettings = {
@@ -170,17 +182,42 @@ const utils = {
     return new TextDecoder().decode(decrypted);
   },
 
-  linkifyUrls: (text) => {
-    return text.replace(
-      /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
+  linkifyUrls(html) {
+    // parse into a temporary document
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // walk only text nodes
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = node.nodeValue;
+      const replaced = text.replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      );
+      if (replaced !== text) {
+        // replace text node with a span containing the new HTML
+        const span = doc.createElement('span');
+        span.innerHTML = replaced;
+        node.parentNode.replaceChild(span, node);
+      }
+    }
+
+    return doc.body.innerHTML;
   },
 };
 
 // Message handling
 const messageHandler = {
   addMessage: (container, user, message, className = '') => {
+    // Handle programming report command
+    if (message.includes('[SHOW_PROGRAMMING_REPORT]')) {
+      showProgrammingReportModal();
+      message =
+        message.replace('[SHOW_PROGRAMMING_REPORT]', '').trim() ||
+        '📊 Showing detailed programming report...';
+    }
+
     // Handle gallery commands
     const galleryMatch = message.match(/\[GALLERY_SHOW\|(.*?)\|([^|]+)\]/);
     if (galleryMatch) {
@@ -188,20 +225,54 @@ const messageHandler = {
       const images = imagesStr.includes('||')
         ? imagesStr.split('||').map((img) => img.trim())
         : [imagesStr.trim()];
-      ImageGalleryController.showGallery(images, title);
-      message =
-        message.replace(fullMatch, '').trim() ||
-        `📸 Showing ${images.length} image${images.length > 1 ? 's' : ''} for ${title}`;
+
+      // Only show gallery if we have valid images
+      if (images.length > 0 && images[0].trim() !== '') {
+        ImageGalleryController.showGallery(images, title);
+        message =
+          message.replace(fullMatch, '').trim() ||
+          `📸 Showing ${images.length} image${images.length > 1 ? 's' : ''} for ${title}`;
+      } else {
+        // Remove the gallery command if no valid images
+        message = message.replace(fullMatch, '').trim();
+      }
     }
+
+    // Handle YouTube gallery commands
+    message = message.replace(/\[YOUTUBE_SHOW\|(.*?)\|([^|]+)\]/g, (_, videosStr, title) => {
+      const videos = videosStr.includes('||')
+        ? videosStr.split('||').map((video) => video.trim())
+        : [videosStr.trim()];
+
+      // Only create button if we have valid videos
+      if (videos.length > 0 && videos[0].trim() !== '') {
+        // Use base64 encoding to avoid JSON corruption from linkifyUrls
+        const vidsJson = btoa(JSON.stringify(videos));
+
+        const buttonId = `youtube-gallery-${Date.now()}`;
+
+        return `<button 
+            class="chat-button youtube-gallery-btn" 
+            data-videos='${vidsJson}' 
+            data-title='${title.replace(/'/g, '&#39;')}'
+            data-button-id='${buttonId}'
+          >
+            🎥 View ${videos.length} YouTube Video${videos.length > 1 ? 's' : ''} for ${title}
+          </button>`;
+      } else {
+        // Return empty string if no valid videos
+        return '';
+      }
+    });
+
+    // Linkify URLs after creating buttons
+    message = utils.linkifyUrls(message);
 
     // Handle button commands
     message = message.replace(
       /\[BUTTON\|([^|]+)\|([^|]+)\]/g,
       '<button class="chat-button" onclick="sendButtonClick(\'$1\', \'$2\')">$2</button>'
     );
-
-    // Linkify URLs
-    message = utils.linkifyUrls(message);
 
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${className}`;
@@ -255,6 +326,9 @@ const messageHandler = {
     let streamingMessage = container.querySelector('#streaming-message');
 
     if (isFirst || !streamingMessage) {
+      // Reset TTS data for new response
+      currentResponseTTS = null;
+
       streamingMessage = document.createElement('div');
       streamingMessage.className = 'message bot streaming';
       streamingMessage.id = 'streaming-message';
@@ -287,20 +361,54 @@ const messageHandler = {
           const images = imagesStr.includes('||')
             ? imagesStr.split('||').map((img) => img.trim())
             : [imagesStr.trim()];
-          ImageGalleryController.showGallery(images, title);
-          content =
-            content.replace(fullMatch, '').trim() ||
-            `📸 Showing ${images.length} image${images.length > 1 ? 's' : ''} for ${title}`;
+
+          // Only show gallery if we have valid images
+          if (images.length > 0 && images[0].trim() !== '') {
+            ImageGalleryController.showGallery(images, title);
+            content =
+              content.replace(fullMatch, '').trim() ||
+              `📸 Showing ${images.length} image${images.length > 1 ? 's' : ''} for ${title}`;
+          } else {
+            // Remove the gallery command if no valid images
+            content = content.replace(fullMatch, '').trim();
+          }
         }
+
+        // Handle YouTube gallery commands
+        content = content.replace(/\[YOUTUBE_SHOW\|(.*?)\|([^|]+)\]/g, (_, videosStr, title) => {
+          const videos = videosStr.includes('||')
+            ? videosStr.split('||').map((video) => video.trim())
+            : [videosStr.trim()];
+
+          // Only create button if we have valid videos
+          if (videos.length > 0 && videos[0].trim() !== '') {
+            // Use base64 encoding to avoid JSON corruption from linkifyUrls
+            const vidsJson = btoa(JSON.stringify(videos));
+
+            const buttonId = `youtube-gallery-${Date.now()}`;
+
+            return `<button 
+                class="chat-button youtube-gallery-btn" 
+                data-videos='${vidsJson}' 
+                data-title='${title.replace(/'/g, '&#39;')}'
+                data-button-id='${buttonId}'
+              >
+                🎥 View ${videos.length} YouTube Video${videos.length > 1 ? 's' : ''} for ${title}
+              </button>`;
+          } else {
+            // Return empty string if no valid videos
+            return '';
+          }
+        });
+
+        // Linkify URLs after creating buttons
+        content = utils.linkifyUrls(content);
 
         // Handle button commands
         content = content.replace(
           /\[BUTTON\|([^|]+)\|([^|]+)\]/g,
           '<button class="chat-button" onclick="sendButtonClick(\'$1\', \'$2\')">$2</button>'
         );
-
-        // Linkify URLs
-        content = utils.linkifyUrls(content);
         messageText.innerHTML = content;
       }
 
@@ -313,6 +421,10 @@ const messageHandler = {
 
       streamingMessage.classList.remove('streaming');
       streamingMessage.removeAttribute('id');
+    } else {
+      // Fallback for cached responses that don't have a streaming message
+      // This handles the case where we receive a complete message without streaming context
+      console.log('🔧 No streaming message found, creating new message for cached response');
     }
   },
 
@@ -356,6 +468,83 @@ const socketHandlers = {
     }
   },
 
+  tts_response: (data) => {
+    // Handle TTS response for cached responses
+    if (data.voice_b64 && isAudioEnabled) {
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      // Detect iOS Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isIOSSafari = isIOS && isSafari;
+
+      let audio;
+
+      if (isIOSSafari) {
+        // iOS Safari: Use Blob URL approach
+        try {
+          const binary = atob(data.voice_b64);
+          const array = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([array], { type: 'audio/wav' });
+          const blobUrl = URL.createObjectURL(blob);
+
+          audio = new Audio(blobUrl);
+
+          // Clean up blob URL when audio ends or errors
+          audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(blobUrl);
+            currentAudio = null;
+          });
+
+          audio.addEventListener('error', () => {
+            URL.revokeObjectURL(blobUrl);
+            currentAudio = null;
+          });
+        } catch (blobErr) {
+          console.error('🔧 Blob creation failed, falling back to Data URI:', blobErr);
+          audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+        }
+      } else {
+        // Non-iOS: Use Data URI approach
+        audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
+      }
+
+      // Set audio properties
+      audio.volume = audioVolume;
+      audio.playbackRate = audioPlaybackRate;
+      audio.preload = 'auto';
+      currentAudio = audio;
+
+      // Play audio with iOS workaround
+      const playAudio = async () => {
+        try {
+          await audio.play();
+        } catch (err) {
+          console.error('🔇 TTS play failed:', err);
+
+          // iOS Safari workaround: Add play button
+          if (isIOSSafari) {
+            addPlayAudioButton(audio, data.voice_b64);
+          }
+        }
+      };
+
+      playAudio();
+
+      // Add replay button to the last cached response message
+      addTTSReplayButtonToCachedResponse(data.voice_b64);
+    } else if (data.error) {
+      console.error('❌ TTS error for cached response:', data.error);
+    }
+  },
+
   bot_message_stream: (data) => {
     if (!elements.messages) return;
 
@@ -373,6 +562,57 @@ const socketHandlers = {
     } else {
       messageHandler.completeStreamingMessage(elements.messages, data.user);
 
+      // If there was no streaming message to complete, create a new message for cached responses
+      if (data.cached && data.full_message) {
+        const existingMessage = elements.messages.querySelector('.message.bot:last-child');
+        if (!existingMessage || !existingMessage.querySelector('.message-text')) {
+          console.log('🔧 Creating new message for cached response');
+          messageHandler.addMessage(elements.messages, data.user, data.full_message, 'bot');
+        }
+      }
+
+      // Debug: Log all incoming data to understand the structure
+
+      // Cache the complete response if we have the full message
+
+      if (data.full_message && data.is_complete) {
+        // Try to find the original question from recent messages
+        const recentMessages = Array.from(elements.messages.children)
+          .filter((msg) => msg.classList.contains('message') && !msg.classList.contains('bot'))
+          .slice(-5) // Last 5 user messages
+          .map((msg) => {
+            const textElement = msg.querySelector('.message-text');
+            return textElement ? textElement.textContent.trim() : '';
+          })
+          .filter((text) => text.length > 0);
+
+        if (recentMessages.length > 0) {
+          // Use the most recent user message as the question
+          const question = recentMessages[recentMessages.length - 1];
+          const cleanQuestion = question.replace(/@bot\s*/i, '').trim();
+
+          // Cache system removed - no more local storage caching
+          // Add timestamp to response
+          const lastBotMessage = Array.from(elements.messages.children)
+            .filter((msg) => msg.classList.contains('message') && msg.classList.contains('bot'))
+            .pop();
+
+          if (lastBotMessage && !lastBotMessage.querySelector('.generated-timestamp')) {
+            // Check if this is a cached response
+            const isCached = data.cached === true;
+            addGeneratedTimestamp(lastBotMessage, currentResponseTTS, isCached);
+            // Reset TTS data after using it
+            currentResponseTTS = null;
+          }
+        } else {
+        }
+      }
+
+      // ✅ Store TTS data for timestamp replay button
+      if (data.voice_b64) {
+        currentResponseTTS = data.voice_b64;
+      }
+
       // ✅ Play TTS audio if provided and audio is enabled
       if (data.voice_b64 && isAudioEnabled) {
         // Stop any currently playing audio
@@ -385,14 +625,6 @@ const socketHandlers = {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const isIOSSafari = isIOS && isSafari;
-
-        // Debug logging
-        console.log('🔍 Device Detection:', {
-          userAgent: navigator.userAgent,
-          isIOS: isIOS,
-          isSafari: isSafari,
-          isIOSSafari: isIOSSafari,
-        });
 
         let audio;
 
@@ -419,8 +651,6 @@ const socketHandlers = {
               URL.revokeObjectURL(blobUrl);
               currentAudio = null;
             });
-
-            console.log('🔧 Using Blob URL for iOS Safari');
           } catch (blobErr) {
             console.error('🔧 Blob creation failed, falling back to Data URI:', blobErr);
             audio = new Audio('data:audio/wav;base64,' + data.voice_b64);
@@ -550,7 +780,7 @@ const socketHandlers = {
     sendPublicKey(data.from);
   },
 
-  pubkey_response: async (data) => {  
+  pubkey_response: async (data) => {
     try {
       const publicKey = await utils.importPublicKey(data.public_key);
       userPublicKeys.set(data.from, publicKey);
@@ -596,7 +826,7 @@ const socketHandlers = {
       );
       setPrivateChatEnabled(false);
       if (elements.privateChatMinimize) {
-      elements.privateChatMinimize.style.display = 'none';
+        elements.privateChatMinimize.style.display = 'none';
       }
       // Clear the current PM user since they disconnected
       currentPmUser = null;
@@ -686,8 +916,6 @@ function addPlayAudioButton(audio, voiceB64) {
 
       // Remove the button after successful play
       playButton.remove();
-
-      console.log('🔊 iOS audio played successfully via button');
     } catch (err) {
       console.error('🔇 iOS audio play failed via button:', err);
 
@@ -707,28 +935,138 @@ function addPlayAudioButton(audio, voiceB64) {
 
   // Add the button to the message
   lastBotMessage.appendChild(playButton);
+}
 
-  console.log('🔊 Added iOS play audio button');
+// WebSocket connection management functions
+function clearTimers() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (pingTimer) {
+    clearInterval(pingTimer);
+    pingTimer = null;
+  }
+  if (pongTimer) {
+    clearTimeout(pongTimer);
+    pongTimer = null;
+  }
+}
+
+function startPingTimer() {
+  if (pingTimer) {
+    clearInterval(pingTimer);
+  }
+
+  pingTimer = setInterval(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({ type: 'ping' }));
+        lastPongTime = Date.now();
+
+        // Set pong timeout
+        if (pongTimer) {
+          clearTimeout(pongTimer);
+        }
+        pongTimer = setTimeout(() => {
+          console.warn('⚠️ Pong timeout - connection may be stale');
+          // Don't disconnect immediately, just log the warning
+        }, WS_CONFIG.PONG_TIMEOUT);
+      } catch (error) {
+        console.error('❌ Failed to send ping:', error);
+      }
+    }
+  }, WS_CONFIG.PING_INTERVAL);
+}
+
+function handleReconnect() {
+  if (isReconnecting) return;
+
+  isReconnecting = true;
+  clearTimers();
+
+  // Calculate exponential backoff delay
+  const delay = Math.min(
+    WS_CONFIG.RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
+    WS_CONFIG.MAX_RECONNECT_DELAY
+  );
+
+  console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1})`);
+
+  reconnectTimer = setTimeout(() => {
+    setupSocket();
+  }, delay);
+
+  reconnectAttempts++;
+}
+
+function resetReconnectAttempts() {
+  reconnectAttempts = 0;
+  isReconnecting = false;
 }
 
 // WebSocket setup
 function setupSocket() {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close();
+  }
+
   socket = new WebSocket(`${WS_CONFIG.ACTIVE_WS_URL}?token=${token}`);
 
   socket.addEventListener('open', () => {
+    console.log('✅ WebSocket connected');
     elements.form.style.pointerEvents = 'auto';
     elements.form.style.opacity = '1';
     elements.connectingOverlay?.classList.add('hidden');
+
+    // Reset reconnection state
+    resetReconnectAttempts();
+
+    // Start ping timer
+    startPingTimer();
   });
 
   socket.addEventListener('message', (event) => {
     try {
       const data = JSON.parse(event.data);
+      console.log('🔍 Received WebSocket message:', data);
+
+      // Handle ping/pong
+      if (data.type === 'ping') {
+        // Respond to ping with pong
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'pong' }));
+        }
+        return;
+      }
+
+      if (data.type === 'pong') {
+        // Update last pong time
+        lastPongTime = Date.now();
+        if (pongTimer) {
+          clearTimeout(pongTimer);
+          pongTimer = null;
+        }
+        return;
+      }
+
+      if (data.type === 'error') {
+        console.error('❌ Server error:', data.message);
+        messageHandler.addMessage(elements.messages, 'System', `Error: ${data.message}`, 'system');
+        return;
+      }
+
       const handler = socketHandlers[data.event] || socketHandlers[data.type];
       if (handler) {
         handler(data.data || data);
-      } else if (typeof data === 'string') {
-          messageHandler.addMessage(elements.messages, 'System', data, 'bot');
+      } else {
+        console.warn('⚠️ No handler found for message type:', data.type || data.event);
+        // Handle unknown message types gracefully
+        if (data.message) {
+          messageHandler.addMessage(elements.messages, 'System', data.message, 'system');
+        } else if (typeof event.data === 'string') {
+          messageHandler.addMessage(elements.messages, 'System', event.data, 'system');
+        }
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
@@ -738,9 +1076,24 @@ function setupSocket() {
     }
   });
 
-  socket.addEventListener('error', () => {
+  socket.addEventListener('error', (error) => {
+    console.error('❌ WebSocket error:', error);
     elements.connectingOverlay.innerHTML =
-      '<div class="username-form"><h2>Connection failed. Try again.</h2></div>';
+      '<div class="username-form"><h2>Connection failed. Trying to reconnect...</h2></div>';
+  });
+
+  socket.addEventListener('close', (event) => {
+    console.log(`🔌 WebSocket closed: ${event.code} - ${event.reason}`);
+    clearTimers();
+
+    // Don't reconnect if it was a normal closure
+    if (event.code === 1000 || event.code === 1001) {
+      console.log('✅ Normal WebSocket closure');
+      return;
+    }
+
+    // Attempt to reconnect
+    handleReconnect();
   });
 }
 
@@ -771,26 +1124,24 @@ function showPmInviteToast(fromUser) {
 }
 
 function declinePmInvite(user, toast) {
-  socket.send(JSON.stringify({ type: 'pm_decline', to: user }));
+  sendSocketMessage({ type: 'pm_decline', to: user });
   toast.remove();
 }
 
 function sendPmInvite(user) {
   ensurePmFooterTab(user, user, 'pending');
-  socket.send(JSON.stringify({ type: 'pm_invite', to: user }));
+  sendSocketMessage({ type: 'pm_invite', to: user });
   requestPublicKey(user);
 }
 
 function requestPublicKey(username) {
-  socket.send(JSON.stringify({ type: 'pubkey_request', to: username }));
+  sendSocketMessage({ type: 'pubkey_request', to: username });
 }
 
 async function sendPublicKey(username) {
   try {
     const publicKeyString = await utils.exportPublicKey(keyPair.publicKey);
-    socket.send(
-      JSON.stringify({ type: 'pubkey_response', to: username, public_key: publicKeyString })
-    );
+    sendSocketMessage({ type: 'pubkey_response', to: username, public_key: publicKeyString });
   } catch (error) {
     console.error(`Error sending public key to ${username}:`, error);
   }
@@ -798,18 +1149,18 @@ async function sendPublicKey(username) {
 
 function acceptPmInvite(user, toast) {
   try {
-  socket.send(JSON.stringify({ type: 'pm_accept', to: user }));
-  ensurePmFooterTab(user, user, 'accepted');
-  openPrivateChat(user);
+    sendSocketMessage({ type: 'pm_accept', to: user });
+    ensurePmFooterTab(user, user, 'accepted');
+    openPrivateChat(user);
 
     // Remove the toast notification
     if (toast && toast.remove) {
-  toast.remove();
+      toast.remove();
     } else if (toast && toast.parentNode) {
       toast.parentNode.removeChild(toast);
     }
 
-  requestPublicKey(user);
+    requestPublicKey(user);
   } catch (error) {
     console.error('Error accepting PM invite:', error);
     // Still try to remove the toast even if there's an error
@@ -823,51 +1174,51 @@ function acceptPmInvite(user, toast) {
 
 function openPrivateChat(user) {
   try {
-  currentPmUser = user;
+    currentPmUser = user;
 
     // Check if elements exist before accessing them
     if (elements.privateChatContainer) {
-  elements.privateChatContainer.style.display = 'flex';
-  elements.privateChatContainer.classList.remove('hidden');
-  elements.privateChatContainer.dataset.user = user;
+      elements.privateChatContainer.style.display = 'flex';
+      elements.privateChatContainer.classList.remove('hidden');
+      elements.privateChatContainer.dataset.user = user;
     }
 
-  const chatUserName = document.getElementById('chat-user-name');
+    const chatUserName = document.getElementById('chat-user-name');
     if (chatUserName) chatUserName.textContent = `with ${user}`;
 
     // Show control buttons
     if (elements.privateChatMinimize) {
-  elements.privateChatMinimize.style.display = 'inline-block';
+      elements.privateChatMinimize.style.display = 'inline-block';
     }
     if (elements.privateChatClose) {
-  elements.privateChatClose.style.display = 'inline-block';
+      elements.privateChatClose.style.display = 'inline-block';
     }
 
     if (elements.privateChatBox) {
-  elements.privateChatBox.innerHTML = '';
-  const messages = pmSessions.get(user) || [];
+      elements.privateChatBox.innerHTML = '';
+      const messages = pmSessions.get(user) || [];
 
-  if (messages.length === 0) {
-    messageHandler.addSystemMessage(
-      elements.privateChatBox,
-      `Private chat with <b>${user}</b> started.`
-    );
-  } else {
-    messages.forEach(({ from, text }) => {
-      messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
-    });
+      if (messages.length === 0) {
+        messageHandler.addSystemMessage(
+          elements.privateChatBox,
+          `Private chat with <b>${user}</b> started.`
+        );
+      } else {
+        messages.forEach(({ from, text }) => {
+          messageHandler.addPrivateMessage(elements.privateChatBox, from, text);
+        });
       }
-  }
+    }
 
-  activateTab(user);
-  const tab = document.getElementById(`pm-tab-${user}`);
-  if (tab?.classList.contains('disconnected')) {
-    setPrivateChatEnabled(false);
+    activateTab(user);
+    const tab = document.getElementById(`pm-tab-${user}`);
+    if (tab?.classList.contains('disconnected')) {
+      setPrivateChatEnabled(false);
       if (elements.privateChatMinimize) {
-    elements.privateChatMinimize.style.display = 'none';
+        elements.privateChatMinimize.style.display = 'none';
       }
-  } else {
-    setPrivateChatEnabled(true);
+    } else {
+      setPrivateChatEnabled(true);
     }
   } catch (error) {
     console.error('Error opening private chat:', error);
@@ -881,9 +1232,12 @@ async function sendPrivateMessage() {
   if (msg && to) {
     try {
       const ciphertext = await utils.encrypt(msg, to);
-      socket.send(JSON.stringify({ type: 'pm_message', to, ciphertext }));
-      messageHandler.addPrivateMessage(elements.privateChatBox, currentUsername, msg);
-      elements.privateInput.value = '';
+      const success = sendSocketMessage({ type: 'pm_message', to, ciphertext });
+
+      if (success) {
+        messageHandler.addPrivateMessage(elements.privateChatBox, currentUsername, msg);
+        elements.privateInput.value = '';
+      }
     } catch (error) {
       console.error('Error sending private message:', error);
       messageHandler.addSystemMessage(
@@ -898,7 +1252,7 @@ function closePrivateChat() {
   const currentUser = elements.privateChatContainer.dataset.user;
   if (currentUser) {
     // Send disconnect message to the other user
-    socket.send(JSON.stringify({ type: 'pm_disconnect', to: currentUser }));
+    sendSocketMessage({ type: 'pm_disconnect', to: currentUser });
 
     // Remove the PM tab completely (regardless of status)
     const tab = document.getElementById(`pm-tab-${currentUser}`);
@@ -1300,6 +1654,43 @@ function setupHelpModalHandlers() {
   });
 }
 
+// Programming Report Modal Functions
+function showProgrammingReportModal() {
+  const modal = document.getElementById('programming-report-modal');
+  modal?.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+
+function hideProgrammingReportModal() {
+  const modal = document.getElementById('programming-report-modal');
+  modal?.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function setupProgrammingReportModalHandlers() {
+  const closeBtn = document.getElementById('programming-report-close');
+  const modal = document.getElementById('programming-report-modal');
+
+  closeBtn?.addEventListener('click', hideProgrammingReportModal);
+
+  // Close modal when clicking outside
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hideProgrammingReportModal();
+    }
+  });
+
+  // Close modal with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal?.classList.contains('hidden')) {
+      hideProgrammingReportModal();
+    }
+  });
+}
+
+// Make the function globally available for bot responses
+window.showProgrammingReportModal = showProgrammingReportModal;
+
 window.insertQuestion = function (element) {
   const question = element.textContent;
   if (elements.input) {
@@ -1396,6 +1787,203 @@ const ImageGalleryController = {
       const hasMultipleImages = this.currentImages.length > 1;
       prevBtn.disabled = !hasMultipleImages;
       nextBtn.disabled = !hasMultipleImages;
+    }
+  },
+};
+
+// YouTube Gallery Controller
+const YouTubeGalleryController = {
+  currentVideos: [],
+  currentIndex: 0,
+  isVisible: false,
+
+  showGalleryFromButton(buttonId, videosJson, title = 'YouTube Videos') {
+    console.log('showGalleryFromButton', buttonId, videosJson, title);
+    // Parse the videos JSON string back to an array
+    let videos;
+    try {
+      // Try to decode base64 first (new method)
+      try {
+        const decodedJson = atob(videosJson);
+        videos = JSON.parse(decodedJson);
+      } catch (base64Error) {
+        // Fallback to old method for backward compatibility
+        let cleanJson = videosJson
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>');
+
+        // Additional cleanup for common JSON corruption issues
+        cleanJson = cleanJson.trim();
+
+        // If the JSON is still malformed, try to extract just the array part
+        if (!cleanJson.startsWith('[')) {
+          const match = cleanJson.match(/\[.*\]/);
+          if (match) {
+            cleanJson = match[0];
+          }
+        }
+
+        videos = JSON.parse(cleanJson);
+      }
+    } catch (error) {
+      console.error('Error parsing videos JSON:', error);
+      console.error('Raw videosJson:', videosJson);
+      return;
+    }
+
+    // Use the same container as the image gallery
+    const container = document.getElementById('image-gallery-container');
+    const titleElement = document.getElementById('gallery-title');
+    const imagesContainer = document.getElementById('gallery-images');
+
+    if (!container || !imagesContainer) {
+      console.error('Image gallery container not found');
+      return;
+    }
+
+    this.currentVideos = videos;
+    this.currentIndex = 0;
+    this.isVisible = true;
+
+    titleElement.textContent = title;
+    imagesContainer.innerHTML = '';
+
+    videos.forEach((videoUrl, index) => {
+      const videoId = this.extractVideoId(videoUrl);
+      if (videoId) {
+        const videoDiv = document.createElement('div');
+        videoDiv.className = index === 0 ? 'youtube-video active' : 'youtube-video';
+        videoDiv.style.display = index === 0 ? 'block' : 'none';
+        videoDiv.style.margin = '0';
+        videoDiv.style.padding = '0';
+        videoDiv.style.width = '100%';
+        videoDiv.style.height = '100%';
+        videoDiv.innerHTML = `
+          <iframe 
+            width="100%" 
+            height="315" 
+            src="https://www.youtube.com/embed/${videoId}" 
+            frameborder="0" 
+            style="margin: 0; padding: 0; border: none;"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        `;
+        imagesContainer.appendChild(videoDiv);
+      }
+    });
+
+    this.updateCounter();
+    this.updateNavButtons();
+    container.classList.remove('hidden');
+  },
+
+  showGallery(videos, title = 'YouTube Videos') {
+    // Legacy method - redirect to the new button-based method
+    this.showGalleryFromButton('legacy', videos, title);
+  },
+
+  createYouTubeGalleryContainer() {
+    // Create the container if it doesn't exist
+    const existingContainer = document.getElementById('youtube-gallery-container');
+    if (existingContainer) return;
+
+    const container = document.createElement('div');
+    container.id = 'youtube-gallery-container';
+    container.className = 'gallery-container hidden';
+    container.innerHTML = `
+      <div class="gallery-overlay">
+        <div class="gallery-content">
+          <div class="gallery-header">
+            <h3 id="youtube-gallery-title">YouTube Videos</h3>
+            <button class="gallery-close" onclick="YouTubeGalleryController.hideGallery()">×</button>
+          </div>
+          <div id="youtube-gallery-videos" class="gallery-videos"></div>
+          <div class="gallery-footer">
+            <button id="youtube-gallery-prev" class="gallery-nav-btn" onclick="YouTubeGalleryController.previousVideo()">‹</button>
+            <span id="youtube-gallery-counter" class="gallery-counter">1 of 1</span>
+            <button id="youtube-gallery-next" class="gallery-nav-btn" onclick="YouTubeGalleryController.nextVideo()">›</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(container);
+  },
+
+  extractVideoId(url) {
+    // Extract video ID from various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
+      /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    return null;
+  },
+
+  hideGallery() {
+    const container = document.getElementById('image-gallery-container');
+    if (container) {
+      container.classList.add('hidden');
+      this.isVisible = false;
+      this.currentVideos = [];
+      this.currentIndex = 0;
+    }
+  },
+
+  nextVideo() {
+    if (this.currentVideos.length <= 1) return;
+
+    const videos = document.querySelectorAll('#gallery-images .youtube-video');
+    if (videos.length === 0) return;
+
+    videos[this.currentIndex].classList.remove('active');
+    videos[this.currentIndex].style.display = 'none';
+    this.currentIndex = (this.currentIndex + 1) % this.currentVideos.length;
+    videos[this.currentIndex].classList.add('active');
+    videos[this.currentIndex].style.display = 'block';
+    this.updateCounter();
+    this.updateNavButtons();
+  },
+
+  previousVideo() {
+    if (this.currentVideos.length <= 1) return;
+
+    const videos = document.querySelectorAll('#gallery-images .youtube-video');
+    if (videos.length === 0) return;
+
+    videos[this.currentIndex].classList.remove('active');
+    videos[this.currentIndex].style.display = 'none';
+    this.currentIndex =
+      this.currentIndex === 0 ? this.currentVideos.length - 1 : this.currentIndex - 1;
+    videos[this.currentIndex].classList.add('active');
+    videos[this.currentIndex].style.display = 'block';
+    this.updateCounter();
+    this.updateNavButtons();
+  },
+
+  updateCounter() {
+    const counter = document.getElementById('gallery-counter');
+    if (counter && this.currentVideos.length > 0) {
+      counter.textContent = `${this.currentIndex + 1} of ${this.currentVideos.length}`;
+    }
+  },
+
+  updateNavButtons() {
+    const prevBtn = document.getElementById('gallery-prev');
+    const nextBtn = document.getElementById('gallery-next');
+    if (prevBtn && nextBtn) {
+      const hasMultipleVideos = this.currentVideos.length > 1;
+      prevBtn.disabled = !hasMultipleVideos;
+      nextBtn.disabled = !hasMultipleVideos;
     }
   },
 };
@@ -1542,8 +2130,8 @@ const backgroundSystem = {
     document.addEventListener(
       'mousemove',
       (e) => {
-      this.mouseX = e.clientX;
-      this.mouseY = e.clientY;
+        this.mouseX = e.clientX;
+        this.mouseY = e.clientY;
       },
       { passive: true }
     );
@@ -1551,9 +2139,9 @@ const backgroundSystem = {
     window.addEventListener(
       'resize',
       () => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
       },
       { passive: true }
     );
@@ -1634,7 +2222,7 @@ const backgroundSystem = {
     };
     if (!this.renderLoopStarted) {
       this.renderLoopStarted = true;
-    requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
     }
   },
 
@@ -1644,212 +2232,6 @@ const backgroundSystem = {
   },
 };
 
-// Toast notification system
-function showToast(message, type = 'info', duration = 5000) {
-  const toastContainer = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span class="toast-text">${message}</span>`;
-
-  toastContainer.appendChild(toast);
-
-  // Trigger animation
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-
-  // Auto remove after duration
-  setTimeout(() => {
-    toast.classList.add('hide');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  }, duration);
-
-  // Click to dismiss
-  toast.addEventListener('click', () => {
-    toast.classList.add('hide');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  });
-
-  return toast;
-}
-
-// Function to update toast content and arrow position
-function updateToastContent(toast, newMessage, arrowX = null) {
-  if (toast) {
-    const textSpan = toast.querySelector('.toast-text');
-    if (textSpan) {
-      textSpan.textContent = newMessage;
-    }
-
-    if (arrowX !== null) {
-      // Update arrow position within the toast
-      toast.style.setProperty('--arrow-x', arrowX + '%');
-    }
-  }
-}
-
-// Function to update sequence content with smooth transitions
-function updateSequenceContent(toast, newMessage, arrowX = null) {
-  if (toast) {
-    // Smooth content transition
-    toast.style.opacity = '0.7';
-    setTimeout(() => {
-      const textSpan = toast.querySelector('.toast-text');
-      if (textSpan) {
-        textSpan.textContent = newMessage;
-      }
-      toast.style.opacity = '1';
-    }, 150);
-
-    if (arrowX !== null) {
-      // Smooth arrow position transition
-      toast.style.setProperty('--arrow-x', arrowX + '%');
-    }
-  }
-}
-
-// Function to create a sequence toast with fixed dimensions
-function showSequenceToast(
-  message,
-  type = 'info',
-  duration = 5000,
-  targetElement = null,
-  position = 'default',
-  offset = null,
-  arrowSide = null,
-  containerWidth = 300,
-  containerHeight = 80,
-  fontSize = null,
-  fontSpacing = null
-) {
-  // For sequence toasts, append directly to body to avoid container positioning issues
-  const toast = document.createElement('div');
-
-  toast.className = `toast ${type} sequence-toast`;
-  toast.innerHTML = `<span class="toast-text">${message}</span>`;
-
-  // Apply custom font size if provided
-  if (fontSize) {
-    toast.style.fontSize = fontSize;
-  }
-
-  // Apply custom letter spacing if provided
-  if (fontSpacing) {
-    toast.style.letterSpacing = fontSpacing;
-  }
-
-  // Set fixed dimensions
-  toast.style.width = containerWidth + 'px';
-  toast.style.height = containerHeight + 'px';
-  toast.style.display = 'flex';
-  toast.style.alignItems = 'center';
-  toast.style.justifyContent = 'center';
-
-  // Check if there are any existing toasts in the DOM for animation
-  const existingToasts = document.querySelectorAll('.toast');
-  const hasExistingToasts = existingToasts.length > 0;
-
-  // Position the toast
-  if (targetElement) {
-    const target = document.querySelector(targetElement);
-    if (target) {
-      const rect = target.getBoundingClientRect();
-      let left, top;
-
-      switch (position) {
-        case 'left':
-          left = rect.left - containerWidth - 50;
-          top = rect.top + rect.height / 2 - containerHeight / 2;
-          const arrowDirection = arrowSide !== null ? arrowSide : 'right';
-          toast.setAttribute('data-arrow', arrowDirection);
-          break;
-        case 'right':
-          left = rect.right + 50;
-          top = rect.top + rect.height / 2 - containerHeight / 2;
-          const arrowDirection2 = arrowSide !== null ? arrowSide : 'left';
-          toast.setAttribute('data-arrow', arrowDirection2);
-          break;
-        case 'top':
-          left = rect.left + rect.width / 2 - containerWidth / 2;
-          top = rect.top - containerHeight - 30;
-          const arrowDirection3 = arrowSide !== null ? arrowSide : 'down';
-          toast.setAttribute('data-arrow', arrowDirection3);
-          break;
-        case 'bottom':
-          left = rect.left + rect.width / 2 - containerWidth / 2;
-          top = rect.bottom + 30;
-          const arrowDirection4 = arrowSide !== null ? arrowSide : 'up';
-          toast.setAttribute('data-arrow', arrowDirection4);
-          break;
-        default:
-          left = rect.left + rect.width / 2 - containerWidth / 2;
-          top = rect.top + rect.height / 2 - containerHeight / 2;
-      }
-
-      // Apply custom offset if provided
-      if (offset) {
-        left += offset.x || 0;
-        top += offset.y || 0;
-      }
-
-      // Ensure toast stays within viewport
-      left = Math.max(20, Math.min(left, window.innerWidth - containerWidth - 20));
-      top = Math.max(20, Math.min(top, window.innerHeight - containerHeight - 20));
-
-      toast.style.position = 'fixed';
-      toast.style.left = left + 'px';
-      toast.style.top = top + 'px';
-      toast.style.zIndex = '1001';
-    }
-  }
-
-  // Add animation class based on whether there are existing toasts
-  if (hasExistingToasts) {
-    toast.classList.add('fade-animation');
-  } else {
-    toast.classList.add('slide-animation');
-  }
-
-  // Add to body instead of toast container
-  document.body.appendChild(toast);
-
-  // Trigger animation
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-
-  // Auto remove after duration (for sequence toasts, this will be overridden)
-  setTimeout(() => {
-    toast.classList.add('hide');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  }, duration);
-
-  // Click to dismiss
-  toast.addEventListener('click', () => {
-    toast.classList.add('hide');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  });
-
-  return toast;
-}
-
 // Initialize app
 window.addEventListener('DOMContentLoaded', () => {
   // Check for token in cookie
@@ -1857,22 +2239,35 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // If no token, just proceed - the server will handle it
   if (!token) {
-    console.log('No token found, proceeding anyway - server will handle authentication');
   }
 
   initializeApp();
+
+  // Cache stats are now only updated when the cache manager modal is opened
 
   // Show tutorial sequence on page load
   setTimeout(() => {
     startTutorialSequence();
   }, 1000);
+
+  // Add event listener for YouTube gallery buttons
+  document.addEventListener('click', (event) => {
+    if (event.target.classList.contains('youtube-gallery-btn')) {
+      const videosJson = event.target.getAttribute('data-videos');
+      const title = event.target.getAttribute('data-title');
+      const buttonId = event.target.getAttribute('data-button-id');
+
+      if (videosJson && title) {
+        YouTubeGalleryController.showGalleryFromButton(buttonId, videosJson, title);
+      }
+    }
+  });
 });
 
 function initializeApp() {
   // If no token, use a default guest username
   if (!token) {
     currentUsername = 'guest_' + Math.random().toString(36).substr(2, 8);
-    console.log('Using default guest username:', currentUsername);
   } else {
     const payload = utils.parseJwt(token);
     if (!payload?.sub) {
@@ -1884,7 +2279,7 @@ function initializeApp() {
   }
 
   // Display name logic
-  window.displayName = localStorage.getItem('displayName') || currentUsername;
+  window.displayName = currentUsername;
   const userDisplay = document.getElementById('current-user');
   const editBtn = document.getElementById('edit-username-btn');
   const input = document.getElementById('edit-username-input');
@@ -1894,7 +2289,7 @@ function initializeApp() {
   function updateDisplayName(name) {
     window.displayName = name;
     userDisplay.textContent = displayName;
-    localStorage.setItem('displayName', displayName);
+    // Cache system removed - no more local storage caching
 
     // Broadcast display name change to other users
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1951,17 +2346,14 @@ function initializeApp() {
   const markUserInteraction = () => {
     if (!userHasInteracted) {
       userHasInteracted = true;
-      console.log('✅ User interaction detected - audio can now play');
 
       // Try to play any pending audio
       if (pendingAudio) {
-        pendingAudio.play().catch((err) => {
-          console.log("🔇 Still can't play pending audio:", err);
-        });
+        pendingAudio.play().catch((err) => {});
         pendingAudio = null;
       } else if (currentAudio && currentAudio.paused) {
         currentAudio.play().catch((err) => {
-          console.log("🔇 Still can't play audio:", err);
+          // Audio play failed
         });
       }
     }
@@ -1988,6 +2380,7 @@ function initializeApp() {
   elements.infoToggle?.addEventListener('click', toggleInfoPanel);
 
   setupHelpModalHandlers();
+  setupProgrammingReportModalHandlers();
 
   elements.usersPanel.classList.add('hidden');
   elements.mainContainer.classList.add('panel-hidden');
@@ -2007,10 +2400,7 @@ function initializeApp() {
       console.error('Failed to generate RSA key pair:', error);
     });
   } else {
-    console.log(
-      '🔐 Skipping RSA key generation - Web Crypto API not available (requires HTTPS or localhost)'
-    );
-    console.log('🔐 Private messages will not be available');
+    // Web Crypto API not available
   }
 
   elements.connectingOverlay?.classList.remove('hidden');
@@ -2021,14 +2411,41 @@ function initializeApp() {
   }, 100);
 }
 
+// Safe message sending function
+function sendSocketMessage(message) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn('⚠️ WebSocket not connected, cannot send message');
+    messageHandler.addMessage(
+      elements.messages,
+      'System',
+      'Connection lost. Trying to reconnect...',
+      'system'
+    );
+    handleReconnect();
+    return false;
+  }
+
+  try {
+    const messageStr = JSON.stringify(message);
+    console.log('🔍 Sending WebSocket message:', messageStr);
+    socket.send(messageStr);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send message:', error);
+    messageHandler.addMessage(
+      elements.messages,
+      'System',
+      'Failed to send message. Trying to reconnect...',
+      'system'
+    );
+    handleReconnect();
+    return false;
+  }
+}
+
 // Chat form submission
 elements.form.addEventListener('submit', (e) => {
   e.preventDefault();
-
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    console.warn('Socket is not connected.');
-    return;
-  }
 
   let message = elements.input.value.trim();
   if (message && currentUsername) {
@@ -2039,16 +2456,28 @@ elements.form.addEventListener('submit', (e) => {
       message = '@bot ' + message;
     }
 
-    socket.send(
-      JSON.stringify({
-        type: 'chat_message',
-        data: {
-          message,
-          displayName: window.displayName || currentUsername,
-        },
-      })
-    );
-    elements.input.value = '';
+    // Check if this is a bot message that we can cache
+    const isBotMessage =
+      message.toLowerCase().includes('@bot') || elements.botToggle.classList.contains('active');
+
+    if (isBotMessage) {
+      // Clean the message for caching (remove @bot prefix)
+      const cleanMessage = message.replace(/@bot\s*/i, '').trim();
+
+      // Check cache first (unless we're generating a new response)
+    }
+
+    const success = sendSocketMessage({
+      type: 'chat_message',
+      data: {
+        message,
+        displayName: window.displayName || currentUsername,
+      },
+    });
+
+    if (success) {
+      elements.input.value = '';
+    }
   }
 });
 
@@ -2267,6 +2696,15 @@ if (elements.settingsBtn) {
     e.preventDefault();
     elements.settingsPopup.classList.toggle('hidden');
   });
+
+  // Cache button functionality
+  const cacheBtn = document.getElementById('cache-btn');
+  if (cacheBtn) {
+    cacheBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      showCacheManager();
+    });
+  }
 
   // Close settings when clicking outside
   document.addEventListener('click', (e) => {
@@ -2518,44 +2956,89 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', function () {
   const closeBtn = document.getElementById('gallery-close');
   if (closeBtn) {
-    closeBtn.addEventListener('click', () => ImageGalleryController.hideGallery());
+    closeBtn.addEventListener('click', () => {
+      // Check if we're showing YouTube videos or images
+      const hasYouTubeVideos =
+        document.querySelectorAll('#gallery-images .youtube-video').length > 0;
+      if (hasYouTubeVideos) {
+        YouTubeGalleryController.hideGallery();
+      } else {
+        ImageGalleryController.hideGallery();
+      }
+    });
   }
 
   const prevBtn = document.getElementById('gallery-prev');
   if (prevBtn) {
-    prevBtn.addEventListener('click', () => ImageGalleryController.previousImage());
+    prevBtn.addEventListener('click', () => {
+      // Check if we're showing YouTube videos or images
+      const hasYouTubeVideos =
+        document.querySelectorAll('#gallery-images .youtube-video').length > 0;
+      if (hasYouTubeVideos) {
+        YouTubeGalleryController.previousVideo();
+      } else {
+        ImageGalleryController.previousImage();
+      }
+    });
   }
 
   const nextBtn = document.getElementById('gallery-next');
   if (nextBtn) {
-    nextBtn.addEventListener('click', () => ImageGalleryController.nextImage());
+    nextBtn.addEventListener('click', () => {
+      // Check if we're showing YouTube videos or images
+      const hasYouTubeVideos =
+        document.querySelectorAll('#gallery-images .youtube-video').length > 0;
+      if (hasYouTubeVideos) {
+        YouTubeGalleryController.nextVideo();
+      } else {
+        ImageGalleryController.nextImage();
+      }
+    });
   }
 
   document.addEventListener('keydown', (e) => {
-    if (!ImageGalleryController.isVisible) return;
+    const isImageGalleryVisible = ImageGalleryController.isVisible;
+    const isYouTubeGalleryVisible = YouTubeGalleryController.isVisible;
+
+    if (!isImageGalleryVisible && !isYouTubeGalleryVisible) return;
 
     if (e.key === 'Escape') {
-      ImageGalleryController.hideGallery();
+      if (isYouTubeGalleryVisible) {
+        YouTubeGalleryController.hideGallery();
+      } else {
+        ImageGalleryController.hideGallery();
+      }
     } else if (e.key === 'ArrowLeft') {
-      ImageGalleryController.previousImage();
+      const hasYouTubeVideos =
+        document.querySelectorAll('#gallery-images .youtube-video').length > 0;
+      if (hasYouTubeVideos) {
+        YouTubeGalleryController.previousVideo();
+      } else {
+        ImageGalleryController.previousImage();
+      }
     } else if (e.key === 'ArrowRight') {
-      ImageGalleryController.nextImage();
+      const hasYouTubeVideos =
+        document.querySelectorAll('#gallery-images .youtube-video').length > 0;
+      if (hasYouTubeVideos) {
+        YouTubeGalleryController.nextVideo();
+      } else {
+        ImageGalleryController.nextImage();
+      }
     }
   });
 });
 
 // Button click handler
 function sendButtonClick(buttonId, buttonText) {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(
-      JSON.stringify({
-        type: 'chat_message',
-        data: { message: `[BUTTON_CLICK|${buttonId}|${buttonText}]` },
-      })
-    );
-  } else {
-    console.error('❌ WebSocket not connected, cannot send button click');
-  }
+  const message = {
+    type: 'chat_message',
+    data: {
+      message: `[BUTTON_CLICK|${buttonId}|${buttonText}]`,
+      displayName: window.displayName || currentUsername,
+    },
+  };
+  console.log('🔍 Sending button click message:', message);
+  sendSocketMessage(message);
 }
 
 // Handle incoming PM message
@@ -2647,367 +3130,812 @@ function clearUnreadStatus(user) {
   unreadCounts.set(user, 0);
 }
 
-// Tutorial sequence function with positioning
+// Enhanced tutorial positioning using getBoundingClientRect()
+class TutorialPositioner {
+  constructor() {
+    this.currentToast = null;
+    this.currentArrow = null;
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+
+    // Give the marker an internal coordinate system that matches your polygon's raw points
+    marker.setAttribute('viewBox', '0 0 10 7');
+
+    // Tell SVG to interpret markerWidth/markerHeight in user-space units (pixels)
+    marker.setAttribute('markerUnits', 'userSpaceOnUse');
+
+    // Now set the on-screen size you actually want, e.g. 40×28px:
+    marker.setAttribute('markerWidth', '40');
+    marker.setAttribute('markerHeight', '28');
+
+    // Re-anchor the "tip" point inside that box (half of height, plus any horizontal offset)
+    marker.setAttribute('refX', '10');
+    marker.setAttribute('refY', '3.5');
+
+    marker.setAttribute('orient', 'auto');
+
+    // Draw the shape in its own 0–10 × 0–7 coordinate space
+    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+    polygon.setAttribute('fill', 'rgba(219, 52, 52, 0.8)');
+
+    marker.appendChild(polygon);
+  }
+
+  // Get the center coordinates of an element
+  getElementCenter(selector) {
+    const element = document.querySelector(selector);
+    if (!element) {
+      return null;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const center = {
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2,
+      rect: rect,
+    };
+
+    return center;
+  }
+
+  // Show a simple toast at a target element
+  showTutorialToast(
+    message,
+    targetSelector,
+    options = {},
+    subStep = false,
+    isInArray = false,
+    firstSubStepPosition = null
+  ) {
+    console.log(
+      'Tutorial: showTutorialToast called with subStep=',
+      subStep,
+      'currentToast exists=',
+      !!this.currentToast,
+      'isInArray=',
+      isInArray
+    );
+    const {
+      position = 'top',
+      preferredSide = null,
+      offset = { x: 0, y: 0 },
+      duration = 3000,
+      type = 'info',
+      fontSize = '16px',
+      autoRemove = true,
+    } = options;
+
+    if (subStep && this.currentToast) {
+      // Sub-step - updating existing toast, no timer
+      // For sub-steps, just update the message and arrow, don't move the toast
+      this.currentToast.querySelector('.tutorial-content').textContent = message;
+
+      // For sub-steps, don't change the arrow orientation - just update the target
+      // Keep the same arrow direction throughout the entire array
+      this.updateArrowTarget(targetSelector, offset);
+
+      // Don't set auto-remove timer for sub-steps - let the parent handle timing
+
+      return this.currentToast;
+    }
+
+    // Remove any existing toast
+    this.removeCurrentToast();
+
+    // Create toast container
+    this.currentToast = document.createElement('div');
+    this.currentToast.className = `tutorial-toast ${type}`;
+    this.currentToast.innerHTML = `
+      <div class="tutorial-content">${message}</div>
+    `;
+    // Add keyframes for the glow animation
+    const glowKeyframes = `
+      @keyframes borderGlow {
+        0% { box-shadow: 0 8px 32px rgba(0,0,0,0.30), 0 0 15px rgba(0, 150, 255, 0.8), 0 0 25px rgba(100, 50, 200, 0.6); }
+        50% { box-shadow: 0 8px 32px rgba(0,0,0,0.30), 0 0 20px rgba(50, 0, 150, 0.9), 0 0 30px rgba(0, 100, 255, 0.7); }
+        100% { box-shadow: 0 8px 32px rgba(0,0,0,0.30), 0 0 15px rgba(0, 150, 255, 0.8), 0 0 25px rgba(100, 50, 200, 0.6); }
+      }
+    `;
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = glowKeyframes;
+    document.head.appendChild(styleSheet);
+
+    Object.assign(this.currentToast.style, {
+      fontSize, // your dynamic size e.g. '14px'
+      background: 'rgba(0, 0, 0, 0.7)', // dark background
+      backdropFilter: 'blur(20px)', // heavy blur
+      WebkitBackdropFilter: 'blur(20px)', // safari support
+      boxShadow:
+        'inset 0 0 0 1px rgba(255,255,255,0.1),' + // subtle white inner border
+        '0 8px 32px rgba(0,0,0,0.40),' + // stronger dark shadow
+        '0 0 15px rgba(0, 150, 255, 0.8),' + // cool blue glow
+        '0 0 25px rgba(100, 50, 200, 0.6)', // dark purple glow
+      borderRadius: '16px', // rounded corners
+      padding: '16px 24px', // roomy padding
+      color: '#ffffff', // pure white text
+      textShadow: '0 1px 2px rgba(0,0,0,0.8)', // stronger text shadow
+      cursor: 'pointer',
+      transition: 'transform 0.2s ease, opacity 0.3s ease',
+      animation: 'bounceIn 0.6s ease-out, borderGlow 3s ease-in-out infinite',
+      border: '2px solid rgba(0, 150, 255, 0.6)',
+    });
+
+    // (Then append to the DOM as before)
+    document.body.appendChild(this.currentToast);
+
+    // Optional: trigger a subtle hover "pop"
+    this.currentToast.addEventListener('mouseenter', () => {
+      this.currentToast.style.transform = 'scale(1.04)';
+    });
+    this.currentToast.addEventListener('mouseleave', () => {
+      this.currentToast.style.transform = 'scale(1)';
+    });
+
+    // Add to document first so we can get proper dimensions
+    document.body.appendChild(this.currentToast);
+
+    // Position the toast relative to the target (after it's in the DOM)
+    this.positionToast(targetSelector, position, offset, preferredSide, false);
+
+    // Auto-remove after duration (but not for any sub-steps or array items)
+    if (autoRemove && !subStep && !isInArray) {
+      // Setting auto-remove timer
+      setTimeout(() => {
+        // Auto-remove timer fired, removing toast
+        this.removeCurrentToast();
+      }, duration);
+    } else if (subStep || isInArray) {
+      // Sub-step or array item - no auto-remove timer set
+    }
+
+    return this.currentToast;
+  }
+
+  // Calculate optimal position based on target location in viewport
+  calculateOptimalPosition(targetSelector, offset, preferredSide = null) {
+    const center = this.getElementCenter(targetSelector);
+    if (!center) return null;
+
+    const toastRect = this.currentToast.getBoundingClientRect();
+    const targetRect = center.rect;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const toastLeftEdge = toastRect.left;
+    const toastRightEdge = toastRect.right;
+    const toastTopEdge = toastRect.top;
+    const toastBottomEdge = toastRect.bottom;
+
+    // Calculate available space in each direction
+    const spaceAbove = targetRect.top;
+    const spaceBelow = viewportHeight - targetRect.bottom;
+    const spaceLeft = targetRect.left;
+    const spaceRight = viewportWidth - targetRect.right;
+
+    // Determine best position based on available space
+    let position, left, top;
+
+    // If preferredSide is specified, try to use it first
+    if (preferredSide) {
+      switch (preferredSide) {
+        case 'top':
+          if (spaceAbove >= toastRect.height + 20) {
+            position = 'top';
+            left = center.centerX - toastRect.width / 2 + offset.x;
+            top = targetRect.top - toastRect.height - 30 + offset.y;
+          }
+          break;
+        case 'bottom':
+          if (spaceBelow >= toastRect.height + 20) {
+            position = 'bottom';
+            left = center.centerX - toastRect.width / 2 + offset.x;
+            top = targetRect.bottom + 30 + offset.y;
+          }
+          break;
+        case 'left':
+          if (spaceLeft >= toastRect.width + 20) {
+            position = 'left';
+            left = targetRect.left - toastRect.width - 30 + offset.x;
+            top = center.centerY - toastRect.height / 2 + offset.y;
+          }
+          break;
+        case 'right':
+          if (spaceRight >= toastRect.width + 20) {
+            position = 'right';
+            left = targetRect.right + 30 + offset.x;
+            top = center.centerY - toastRect.height / 2 + offset.y;
+          } else {
+          }
+          break;
+      }
+    }
+
+    // If preferredSide couldn't be used or wasn't specified, calculate optimal position
+    if (!position) {
+      // Check if we have more vertical space or horizontal space
+      const verticalSpace = Math.max(spaceAbove, spaceBelow);
+      const horizontalSpace = Math.max(spaceLeft, spaceRight);
+
+      if (verticalSpace >= horizontalSpace) {
+        // Prefer vertical positioning (top/bottom)
+        if (spaceAbove >= spaceBelow) {
+          // Position above
+          position = 'top';
+          left = center.centerX - toastRect.width / 2 + offset.x;
+          top = targetRect.top - toastRect.height - 30 + offset.y;
+        } else {
+          // Position below
+          position = 'bottom';
+          left = center.centerX - toastRect.width / 2 + offset.x;
+          top = targetRect.bottom + 30 + offset.y;
+        }
+      } else {
+        // Prefer horizontal positioning (left/right)
+        if (spaceLeft >= spaceRight) {
+          // Position to the left
+          position = 'left';
+          left = targetRect.left - toastRect.width - 30 + offset.x;
+          top = center.centerY - toastRect.height / 2 + offset.y;
+        } else {
+          // Position to the right
+          position = 'right';
+          left = targetRect.right + 30 + offset.x;
+          top = center.centerY - toastRect.height / 2 + offset.y;
+        }
+      }
+    }
+
+    // Ensure toast stays within viewport bounds
+    if (left < 10) left = 10;
+    if (left + toastRect.width > viewportWidth - 10) {
+      left = viewportWidth - toastRect.width - 10;
+    }
+    if (top < 10) top = 10;
+    if (top + toastRect.height > viewportHeight - 10) {
+      top = viewportHeight - toastRect.height - 10;
+    }
+
+    return { position, left, top, targetCenter: { x: center.centerX, y: center.centerY } };
+  }
+
+  // Position the toast using intelligent positioning
+  positionToast(targetSelector, position, offset, preferredSide = null, subStep = false) {
+    // For sub-steps, don't reposition the toast, just update the arrow
+    if (subStep) {
+      this.removeCurrentArrow();
+      this.createArrow(targetSelector, position, offset);
+      return;
+    }
+
+    // If position is specified, use it; otherwise calculate optimal position
+    let positioning;
+
+    if (position && position !== 'auto') {
+      // Use specified position with fallback logic
+      positioning = this.calculateSpecifiedPosition(targetSelector, position, offset);
+    } else {
+      // Calculate optimal position automatically
+      positioning = this.calculateOptimalPosition(targetSelector, offset, preferredSide);
+    }
+
+    if (!positioning) return;
+
+    this.currentToast.style.left = `${positioning.left}px`;
+    this.currentToast.style.top = `${positioning.top}px`;
+
+    // Create arrow pointing to the target
+    this.createArrow(targetSelector, positioning.position, offset);
+  }
+
+  // Calculate position for specified direction (with fallback)
+  calculateSpecifiedPosition(targetSelector, position, offset) {
+    const center = this.getElementCenter(targetSelector);
+    if (!center) return null;
+
+    const toastRect = this.currentToast.getBoundingClientRect();
+    const toastRectCenter = {
+      x: toastRect.left + toastRect.width / 2,
+      y: toastRect.top + toastRect.height / 2,
+    };
+    const targetRect = center.rect;
+    // the difference in height between the toast and the target
+    const toastTargetCenterDelta = toastRect.height - targetRect.height;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let left, top;
+
+    switch (position) {
+      case 'top':
+        // Arrow points down: straight vertical line from toast bottom to target center
+        startX = center.centerX; // Start at target's X position (horizontal alignment)
+        startY = toastRect.bottom; // Start at toast bottom edge
+        // subtract  half the distance between the toast and the target
+        endX = center.centerX - toastRect.width / 2; // End at target center X
+        endY = center.centerY - toastRect.height / 2; // End 10px before target center
+
+        break;
+      case 'bottom':
+        // Arrow points up: straight vertical line from toast top to target center
+        startX = center.centerX; // Start at target's X position (horizontal alignment)
+        startY = toastRect.top; // Start at toast top edge
+        endX = center.centerX - toastRect.width / 2; // End at target center X
+        endY = center.centerY + toastRect.height / 2; // End 10px before target center
+        break;
+      case 'left':
+        // Arrow points right: horizontal line from toast right to target center
+        startX = toastRect.right; // Start at toast right edge
+        startY = center.centerY; // Start at target's Y position (vertical alignment)
+        endX = center.centerX; // End 10px before target center
+        endY = center.centerY - toastRect.height / 2; // End at target center Y
+        break;
+      case 'right':
+        // Arrow points left: horizontal line from toast left to target center
+        startX = toastRect.left; // Start at toast left edge
+        startY = center.centerY; // Start at target's Y position (vertical alignment)
+        endX = center.centerX; // End 10px before target center
+        endY = center.centerY - toastRect.height / 2; // End at target center Y
+        break;
+      default:
+        return this.calculateOptimalPosition(targetSelector, offset);
+    }
+
+    // Ensure toast stays within viewport
+    if (left < 10) left = 10;
+    if (left + toastRect.width > viewportWidth - 10) {
+      left = viewportWidth - toastRect.width - 10;
+    }
+    if (top < 10) top = 10;
+    if (top + toastRect.height > viewportHeight - 10) {
+      top = viewportHeight - toastRect.height - 10;
+    }
+
+    return { position, left, top, targetCenter: { x: center.centerX, y: center.centerY } };
+  }
+
+  // Remove current toast
+  removeCurrentToast() {
+    // removeCurrentToast called
+    if (this.currentToast && this.currentToast.parentNode) {
+      // Removing toast from DOM
+      this.currentToast.parentNode.removeChild(this.currentToast);
+      this.currentToast = null;
+    }
+
+    // Also remove any existing arrow
+    this.removeCurrentArrow();
+  }
+
+  // Create and position an arrow pointing to the target
+  createArrow(targetSelector, position, offset) {
+    const center = this.getElementCenter(targetSelector);
+    const toastColor = 'rgba(11, 255, 255, 0.3)';
+
+    if (!center || !this.currentToast) return;
+
+    const toastRect = this.currentToast.getBoundingClientRect();
+    //
+    const targetRect = center.rect;
+    const userToggle = document.getElementById('users-toggle');
+    // find the text-node (should be the emoji)
+    const textNode = Array.from(userToggle.childNodes).find((n) => n.nodeType === Node.TEXT_NODE);
+
+    const range = document.createRange();
+    range.selectNode(textNode);
+
+    const textRect = range.getBoundingClientRect();
+    const textCenter = {
+      x: textRect.left + textRect.width / 2,
+      y: textRect.top + textRect.height / 2,
+    };
+
+    // Remove any existing arrow
+    this.removeCurrentArrow();
+
+    // Create SVG container for the arrow
+    this.currentArrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.currentArrow.style.position = 'fixed';
+    this.currentArrow.style.left = '0';
+    this.currentArrow.style.top = '0';
+    this.currentArrow.style.width = '100%';
+    this.currentArrow.style.height = '100%';
+    this.currentArrow.style.pointerEvents = 'none';
+
+    // Create arrow marker definition
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'tutorial-arrowhead');
+    marker.setAttribute('markerWidth', '100');
+    marker.setAttribute('markerHeight', '100');
+    marker.setAttribute('refX', '5');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('orient', 'auto');
+
+    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+    polygon.setAttribute('fill', toastColor);
+    // lower z index
+
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
+    this.currentArrow.appendChild(defs);
+    this.currentArrow.style.zIndex = '1100';
+
+    // Calculate arrow start and end points based on position
+    // Arrow starts from the edge of the toast and creates straight lines
+    let startX, startY;
+    let endX, endY;
+
+    // Calculate the optimal position for the arrow based on toast and target positions
+    const toastCenterX = toastRect.left + toastRect.width / 2;
+    const toastCenterY = toastRect.top + toastRect.height / 2;
+    const targetCenterX = center.centerX;
+    const targetCenterY = center.centerY;
+
+    // Arrow positioning - position: position, target: targetSelector
+    // Toast center: toastCenterX, toastCenterY
+    // Target center: targetCenterX, targetCenterY
+
+    switch (position) {
+      case 'top':
+        // Toast is ABOVE target, so arrow points DOWN from toast bottom to target top
+        startX = toastCenterX;
+        startY = toastRect.bottom + 10;
+        endX = targetCenterX;
+        endY = targetRect.top - 10;
+        break;
+      case 'bottom':
+        // Toast is BELOW target, so arrow points UP from toast top to target bottom
+        startX = toastCenterX;
+        startY = toastRect.top - 10;
+        endX = targetCenterX;
+        endY = targetRect.bottom + 10;
+        break;
+      case 'left':
+        // Toast is to the LEFT of target, so arrow points RIGHT from toast right to target left
+        startX = toastRect.right + 10;
+        startY = toastCenterY;
+        endX = targetRect.left - 10;
+        endY = targetCenterY;
+        break;
+      case 'right':
+        // Toast is to the RIGHT of target, so arrow points LEFT from toast left to target right
+        startX = toastRect.left - 10;
+        startY = toastCenterY;
+        endX = targetRect.right + 10;
+        endY = targetCenterY;
+        break;
+      default:
+        // Auto-calculate based on relative positions
+        const deltaX = targetCenterX - toastCenterX;
+        const deltaY = targetCenterY - toastCenterY;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          // Horizontal arrow
+          if (deltaX > 0) {
+            // Target is to the right
+            startX = toastRect.right + 10;
+            startY = toastCenterY;
+            endX = targetRect.left - 10;
+            endY = targetCenterY;
+          } else {
+            // Target is to the left
+            startX = toastRect.left - 10;
+            startY = toastCenterY;
+            endX = targetRect.right + 10;
+            endY = targetCenterY;
+          }
+        } else {
+          // Vertical arrow
+          if (deltaY > 0) {
+            // Target is below
+            startX = toastCenterX;
+            startY = toastRect.bottom + 10;
+            endX = targetCenterX;
+            endY = targetRect.top - 10;
+          } else {
+            // Target is above
+            startX = toastCenterX;
+            startY = toastRect.top - 10;
+            endX = targetCenterX;
+            endY = targetRect.bottom + 10;
+          }
+        }
+        break;
+    }
+
+    // Create just the arrowhead (no line)
+    const arrowhead = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    const arrowheadSize = 15; // Smaller arrowhead for better appearance
+    let points;
+
+    // Use fixed arrow direction based on position parameter
+    if (position === 'top') {
+      // Toast is above target, arrow points down
+      points = `
+        ${endX},${endY}
+        ${endX - arrowheadSize},${endY - arrowheadSize}
+        ${endX + arrowheadSize},${endY - arrowheadSize}
+      `;
+    } else if (position === 'bottom') {
+      // Toast is below target, arrow points up
+      points = `
+        ${endX},${endY}
+        ${endX - arrowheadSize},${endY + arrowheadSize}
+        ${endX + arrowheadSize},${endY + arrowheadSize}
+      `;
+    } else if (position === 'left') {
+      // Toast is to the left of target, arrow points right
+      points = `
+        ${endX},${endY}
+        ${endX - arrowheadSize},${endY - arrowheadSize}
+        ${endX - arrowheadSize},${endY + arrowheadSize}
+      `;
+    } else if (position === 'right') {
+      // Toast is to the right of target, arrow points left
+      points = `
+        ${endX},${endY}
+        ${endX + arrowheadSize},${endY - arrowheadSize}
+        ${endX + arrowheadSize},${endY + arrowheadSize}
+      `;
+    } else {
+      // Auto-calculate based on relative positions (fallback)
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal arrow
+        if (deltaX > 0) {
+          // Arrow points right
+          points = `
+            ${endX},${endY}
+            ${endX - arrowheadSize},${endY - arrowheadSize}
+            ${endX - arrowheadSize},${endY + arrowheadSize}
+          `;
+        } else {
+          // Arrow points left
+          points = `
+            ${endX},${endY}
+            ${endX + arrowheadSize},${endY - arrowheadSize}
+            ${endX + arrowheadSize},${endY + arrowheadSize}
+          `;
+        }
+      } else {
+        // Vertical arrow
+        if (deltaY > 0) {
+          // Arrow points down
+          points = `
+            ${endX},${endY}
+            ${endX - arrowheadSize},${endY - arrowheadSize}
+            ${endX + arrowheadSize},${endY - arrowheadSize}
+          `;
+        } else {
+          // Arrow points up
+          points = `
+            ${endX},${endY}
+            ${endX - arrowheadSize},${endY + arrowheadSize}
+            ${endX + arrowheadSize},${endY + arrowheadSize}
+          `;
+        }
+      }
+    }
+
+    arrowhead.setAttribute('points', points);
+
+    arrowhead.setAttribute('fill', toastColor);
+    arrowhead.classList.add('tutorial-arrow');
+
+    this.currentArrow.appendChild(arrowhead);
+    document.body.appendChild(this.currentArrow);
+  }
+
+  // Remove current arrow
+  removeCurrentArrow() {
+    if (this.currentArrow && this.currentArrow.parentNode) {
+      this.currentArrow.parentNode.removeChild(this.currentArrow);
+      this.currentArrow = null;
+    }
+  }
+
+  // Update arrow target without changing orientation (for sub-steps)
+  updateArrowTarget(targetSelector, offset) {
+    if (!this.currentArrow || !this.currentToast) return;
+
+    // Just recreate the arrow with the same position but new target
+    // This is simpler and more reliable
+    this.removeCurrentArrow();
+
+    // Use the same position as the first sub-step to maintain consistency
+    const effectivePosition = 'bottom'; // Hardcode for now since we know it's bottom
+    this.createArrow(targetSelector, effectivePosition, offset);
+  }
+}
+
+// Simple tutorial sequence function
 function startTutorialSequence() {
+  const tutorial = new TutorialPositioner();
+
   const tutorialSteps = [
     {
-      message: ' Click here to see online users and start private chats',
-      type: 'info',
-      duration: 2100,
-      target: '#users-toggle', // Back to targeting the toggle button
-      position: 'left',
-      offset: { x: 30, y: 0 }, // Custom offset
-      arrowSide: 'right', // Force arrow on right side
-      fontSize: '14px', // Custom font size
-      skip: false, // Set to true to skip this step
+      message: 'Click here to see online users and start private chats',
+      target: '#users-toggle',
+      options: {
+        position: null, // Let the system decide the best position
+        preferredSide: 'right', // 'top', 'bottom', 'left', 'right', or null for auto
+        offset: { x: 0, y: 0 },
+        duration: 1600,
+        type: 'info',
+        fontSize: '16px',
+      },
     },
     {
       message: "💡 Click here for quick questions about Ryan's experience",
-      type: 'info',
-      duration: 2100,
-      target: '#info-toggle', // Back to targeting the toggle button
-      position: 'right',
-      offset: { x: -30, y: 0 }, // Custom offset
-      arrowSide: 'left', // Force arrow on left side
-      fontSize: '16px', // Custom font size
-      skip: false, // Set to true to skip this step
+      target: '#info-toggle',
+      options: {
+        position: null, // Let the system decide the best position
+        preferredSide: 'left', // 'top', 'bottom', 'left', 'right', or null for auto
+        offset: { x: 0, y: 0 },
+        duration: 1600,
+        type: 'info',
+        fontSize: '16px',
+      },
     },
     {
       message: 'Toggle this to chat with the AI assistant about projects',
-      type: 'success',
-      duration: 2100,
-      target: '.bot-robot-button', // Points to bot toggle button
-      position: 'top',
-      arrowSide: 'up', // Force arrow on down side
-      offset: { x: 0, y: -50 },
-      fontSize: '18px', // Custom font size
-      skip: false, // Set to true to skip this step
-    },
-    {
-      message: 'Audio Controls',
-      type: 'info',
-      duration: 8000,
-      target: '#audio-toggle', // Points to audio controls
-      position: 'bottom',
-      arrowSide: 'down', // ← THIS IS THE MISSING LINE
-      fontSize: '16px',
-      skip: true,
-      offset: { x: 100, y: 0 },
-      sequence: {
-        containerWidth: 400,
-        containerHeight: 80,
-        steps: [
-          {
-            message: '🔊 Click to enable/disable audio responses',
-            duration: 2100,
-            arrowX: 25, // Arrow position within toast (percentage from left)
-            arrowSide: 'down', // Force arrow on down side
-            target: '#audio-toggle', // Points to audio controls
-            skip: false,
-
-          },
-          {
-            message: '🎚️ Hover + scroll to adjust volume',
-            duration: 2000,
-            arrowX: 25, // Arrow position within toast (percentage from left)
-            arrowSide: 'down', // Force arrow on down side
-            target: '#audio-toggle', // Points to audio controls
-            skip: false,
-          },
-          {
-            message: '⚡ Scroll to change playback speed',
-            duration: 2000,
-            arrowX: 38, // Arrow position within toast
-          },
-          {
-            message: 'General info about this app',
-            duration: 2000,
-            arrowX: 50, // Arrow position within toast
-            skip: false,
-          },
-        ],
+      target: '.bot-robot-button',
+      options: {
+        position: null, // Let the system decide the best position
+        preferredSide: 'top', // 'top', 'bottom', 'left', 'right', or null for auto
+        offset: { x: 0, y: 0 },
+        duration: 1600,
+        type: 'info',
+        fontSize: '16px',
       },
     },
 
-
+    [
+      {
+        message: 'Audio Controls - Click to enable/disable audio responses',
+        target: '#audio-toggle',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+      {
+        message: 'Audio Controls - scroll for audio speed',
+        target: '#speed-toggle',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+      {
+        message: 'Audio Controls - Click for info',
+        target: '#help-button',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+    ],
 
     {
-      message: 'Set custome username if desired',
-      target: '.username-display', // <-- class selector
-      position: 'top',
-      top: 70,
-      skip: false,
-      arrowX: 60, // Arrow positi on within toast
-      type: 'info',
-      duration: 2000,
-      fontSize: '16px', // Custom font size for sequence toast
-    },
-
-    {
-      message: '🔊 Settings Controls',
-      type: 'info',
-      duration: 5000,
-      target: '#logout-btn', // Points to audio controls
-      position: 'bottom',
-      arrowSide: 'down', // ← THIS IS THE MISSING LINE
-
-      fontSize: '16px',
-      skip: false,
-      offset: { x: 100, y: 0 },
-      sequence: {
-        containerWidth: 400,
-        containerHeight: 80,
-        steps: [
-          {
-            message: 'Background Settings',
-            duration: 2000,
-            arrowX: 77, // Arrow position within toast (percentage from left)
-            arrowSide: 'down', // Force arrow on down side
-            target: '#logout-btn', // Points to audio controls
-          },
-          {
-            message: 'Logout, remove JWT from local storage',
-            duration: 2000,
-            arrowX: 90, // Arrow position within toast (percentage from left)
-            arrowSide: 'down', // Force arrow on down side
-            target: '#logout-btn', // Points to audio controls
-          },
-        ],
+      message: 'Set custom username if desired',
+      target: '.username-display',
+      options: {
+        position: null, // Let the system decide the best position
+        preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+        offset: { x: 0, y: 0 },
+        duration: 1600,
+        type: 'info',
+        fontSize: '16px',
       },
     },
-  ]
+    [
+      {
+        message: 'Settings Controls - Background settings and logout',
+        target: '#logout-btn',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+      {
+        message: 'Settings Controls - Background settings',
+        target: '#settings-btn',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+      {
+        message: 'Settings Controls - Cache Info',
+        target: '#cache-btn',
+        options: {
+          position: null, // Let the system decide the best position
+          preferredSide: 'bottom', // 'top', 'bottom', 'left', 'right', or null for auto
+          offset: { x: 0, y: 0 },
+          duration: 1600,
+          type: 'info',
+          fontSize: '16px',
+        },
+      },
+    ],
+  ];
 
-
-
-    // {
-    //   message: 'desired',
-    //   target: '#logout-btn', // <-- class selector
-    //   position: 'top',
-    //   top: 810,
-    //   skip: false,
-    //   arrowX: 68, // Arrow positi on within toast
-    //   type: 'info',
-    //   duration: 1000,
-    //   fontSize: '16px', // Custom font size for sequence toast
-    //   arrowSide: 'down', // ← ADD THIS ONE LINE
-    //   sequence: {
-    //     containerWidth: 300,
-    //     containerHeight: 80,
-    //     steps: [
-    //       {
-    //         message: 'Click to log out',
-    //         duration: 111000,
-    //         arrowX: 50,
-    //         arrowSide: 'down',
-    //         target: '#logout-btn',
-    //         containerWidth: 300, // 👈 Needed for center alignment
-    //         containerHeight: 80, // 👈 Needed for top/bottom math
-    //         offset: { x: 100, y: 0 },
-
-    //       },
-    //     ],
-    //   },
-    // },
-  
   let currentStep = 0;
-  let currentNestedStep = 0;
-  let currentToast = null;
 
   function showNextStep() {
-    // Skip steps that have skip: true
-    while (currentStep < tutorialSteps.length && tutorialSteps[currentStep].skip) {
-      currentStep++;
+    if (currentStep >= tutorialSteps.length) {
+      return;
     }
 
-    if (currentStep < tutorialSteps.length) {
-      const step = tutorialSteps[currentStep];
+    const step = tutorialSteps[currentStep];
 
-      if (step.sequence) {
-        // Handle sequence type - maintains same container
-        if (currentNestedStep === 0) {
-          // Show initial toast with fixed dimensions
-          console.log(
-            'Creating sequence toast - Target:',
-            step.target,
-            'Position:',
-            step.position,
-            'ArrowSide:',
-            step.arrowSide
+    if (Array.isArray(step)) {
+      // Handle array of steps - show them sequentially
+      let subStepIndex = 0;
+
+      const showSubStep = () => {
+        if (subStepIndex < step.length) {
+          const subStep = step[subStepIndex];
+          // Showing sub-step
+          // First sub-step creates the toast, subsequent ones update it
+          const isSubStep = subStepIndex > 0;
+          const isInArray = true; // All items in an array should not set auto-remove timers
+          // Calling showTutorialToast with subStep
+          // Pass the first sub-step's position for consistency
+          const firstSubStepPosition = step[0].options.position;
+          tutorial.showTutorialToast(
+            subStep.message,
+            subStep.target,
+            subStep.options,
+            isSubStep,
+            isInArray,
+            firstSubStepPosition
           );
-          console.log('About to create sequence toast with step:', step);
-          currentToast = showSequenceToast(
-            step.message,
-            step.type,
-            step.duration,
-            step.target,
-            step.position,
-            step.offset,
-            step.arrowSide,
-            step.sequence.containerWidth,
-            step.sequence.containerHeight,
-            step.fontSize,
-            step.fontSpacing
-          );
-          console.log('Sequence toast created:', currentToast);
-        }
+          subStepIndex++;
 
-        if (currentNestedStep < step.sequence.steps.length) {
-          // Update toast content and arrow position
-          const sequenceStep = step.sequence.steps[currentNestedStep];
-          console.log('Processing sequence step:', currentNestedStep, 'with data:', sequenceStep);
-
-          // Always recalculate position to ensure offset is applied
-          const target = document.querySelector(step.target);
-          if (target) {
-            const rect = target.getBoundingClientRect();
-            let left, top;
-
-            // Recalculate position based on current step position
-            switch (step.position) {
-              case 'bottom':
-                left =
-                  rect.left +
-                  rect.width / 2 -
-                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
-                top = rect.bottom + 30;
-                break;
-              case 'top':
-                left =
-                  rect.left +
-                  rect.width / 2 -
-                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
-                top =
-                  rect.top - (sequenceStep.containerHeight || step.sequence.containerHeight) - 30;
-                break;
-              case 'left':
-                left =
-                  rect.left - (sequenceStep.containerWidth || step.sequence.containerWidth) - 50;
-                top =
-                  rect.top +
-                  rect.height / 2 -
-                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
-                break;
-              case 'right':
-                left = rect.right + 50;
-                top =
-                  rect.top +
-                  rect.height / 2 -
-                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
-                break;
-              default:
-                left =
-                  rect.left +
-                  rect.width / 2 -
-                  (sequenceStep.containerWidth || step.sequence.containerWidth) / 2;
-                top =
-                  rect.top +
-                  rect.height / 2 -
-                  (sequenceStep.containerHeight || step.sequence.containerHeight) / 2;
-            }
-
-            // Apply custom offset if provided
-            if (step.offset) {
-              left += step.offset.x || 0;
-              top += step.offset.y || 0;
-            }
-
-            // Apply custom top/bottom from sequence step if provided (only if it's a positive value)
-            if (
-              sequenceStep.top !== null &&
-              sequenceStep.top !== undefined &&
-              sequenceStep.top >= 0
-            ) {
-              console.log('Sequence step using custom top:', sequenceStep.top);
-              top = sequenceStep.top;
-            } else if (
-              sequenceStep.bottom !== null &&
-              sequenceStep.bottom !== undefined &&
-              sequenceStep.bottom >= 0
-            ) {
-              console.log('Sequence step using custom bottom:', sequenceStep.bottom);
-              // For bottom positioning, we need to calculate from viewport height
-              top =
-                window.innerHeight -
-                (sequenceStep.bottom +
-                  (sequenceStep.containerHeight || step.sequence.containerHeight));
-            }
-
-            console.log('left:', left, 'top:', top);
-
-            // Ensure toast stays within viewport
-            const containerWidth = sequenceStep.containerWidth || step.sequence.containerWidth;
-            const containerHeight = sequenceStep.containerHeight || step.sequence.containerHeight;
-            left = Math.max(20, Math.min(left, window.innerWidth - containerWidth - 20));
-            top = Math.max(20, Math.min(top, window.innerHeight - containerHeight - 20));
-
-            // Update dimensions and position
-            if (sequenceStep.containerWidth) {
-              currentToast.style.width = sequenceStep.containerWidth + 'px';
-            }
-            if (sequenceStep.containerHeight) {
-              currentToast.style.height = sequenceStep.containerHeight + 'px';
-            }
-
-            currentToast.style.left = left + 'px';
-            currentToast.style.top = top + 'px';
-          }
-
-          updateSequenceContent(currentToast, sequenceStep.message, sequenceStep.arrowX);
-          currentNestedStep++;
-
-          // Schedule next sequence step
-          setTimeout(showNextStep, sequenceStep.duration);
-        } else {
-          // Move to next main step
-          currentNestedStep = 0;
-          // Remove the sequence toast
-          if (currentToast && currentToast.parentNode) {
-            currentToast.classList.add('hide');
+          // Schedule next sub-step or move to next main step
+          if (subStepIndex < step.length) {
+            setTimeout(showSubStep, subStep.options.duration + 100);
+          } else {
+            // All sub-steps done, set timer to remove toast and move to next main step
             setTimeout(() => {
-              if (currentToast && currentToast.parentNode) {
-                currentToast.parentNode.removeChild(currentToast);
-              }
-            }, 300);
+              tutorial.removeCurrentToast();
+              currentStep++;
+              setTimeout(showNextStep, 100);
+            }, subStep.options.duration + 100);
           }
-          currentToast = null;
-          currentStep++;
-          setTimeout(showNextStep, 500);
         }
-      } else {
-        // Regular single toast
-        console.log(
-          'Tutorial step:',
-          currentStep,
-          'Target:',
-          step.target,
-          'Position:',
-          step.position,
-          'ArrowSide:',
-          step.arrowSide
-        );
-        console.log('Tutorial step config:', {
-          message: step.message,
-          top: step.top,
-          bottom: step.bottom,
-          offset: step.offset,
-        });
-        showPositionedToast(
-          step.message,
-          step.type,
-          step.duration,
-          step.target,
-          step.position,
-          step.offset,
-          step.arrowSide,
-          step.fontSize,
-          step.fontSpacing,
-          step.top,
-          step.bottom,
-          step.arrowX
-        );
-        currentStep++;
-        setTimeout(showNextStep, step.duration + 500);
-      }
+      };
+
+      showSubStep();
+    } else {
+      // Handle single step
+      tutorial.showTutorialToast(step.message, step.target, step.options);
+      currentStep++;
+      setTimeout(showNextStep, step.options.duration + 100);
     }
   }
 
@@ -3015,194 +3943,92 @@ function startTutorialSequence() {
   showNextStep();
 }
 
-// Enhanced toast function with positioning
-function showPositionedToast(
-  message,
-  type = 'info',
-  duration = 5000,
-  targetElement = null,
-  position = 'default',
-  offset = null,
-  arrowSide = null,
-  fontSize = null,
-  fontSpacing = null,
-  customTop = null,
-  customBottom = null,
-  arrowX = null
-) {
-  console.log('showPositionedToast called with:', {
-    message,
-    targetElement,
-    position,
-    customTop,
-    customBottom,
-    offset,
-  });
-  const toastContainer = document.getElementById('toast-container');
-  const toast = document.createElement('div');
+// ===================================
+// RESPONSE CACHING SYSTEM
+// ===================================
 
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span class="toast-text">${message}</span>`;
+// Cache system removed - no more local storage caching
 
-  // Set explicit width for toasts appended to body
-  toast.style.width = '300px';
-  toast.style.maxWidth = '300px';
+// Sync with backend cache after initialization
 
-  // Apply custom font size if provided
-  if (fontSize) {
-    toast.style.fontSize = fontSize;
-  }
+// ===================================
+// CACHED MESSAGE DISPLAY
+// ===================================
 
-  // Apply custom letter spacing if provided
-  if (fontSpacing) {
-    toast.style.letterSpacing = fontSpacing;
-  }
+// Add a bot message with cache indicator
+// Cache system removed - no more local storage caching
 
-  // Check if there are any existing toasts
-  const existingToasts = toastContainer.querySelectorAll('.toast');
-  const hasExistingToasts = existingToasts.length > 0;
-  console.log('hasExistingToasts:', hasExistingToasts);
-  console.log('targetElement:', targetElement);
+// Global flag to track if we're generating a "new response" (shouldn't be cached)
+let isGeneratingNewResponse = false;
 
-  // Position the toast
-  if (targetElement) {
-    const target = document.querySelector(targetElement);
-    console.log('Target query result:', target);
-    if (target) {
-      const rect = target.getBoundingClientRect();
-      let left, top;
+// Global variable to store TTS data for the current response
+let currentResponseTTS = null;
 
-      switch (position) {
-        case 'left':
-          left = rect.left - 500; // Much larger distance for toggle buttons
-          top = rect.top + rect.height / 2 - 25;
-          const arrowDirection = arrowSide !== null ? arrowSide : 'right';
-          toast.setAttribute('data-arrow', arrowDirection);
-          console.log('Setting arrow direction:', arrowDirection, 'for position:', position);
-          break;
-        case 'right':
-          left = rect.right + 80; // Much larger distance for toggle buttons
-          top = rect.top + rect.height / 2 - 25;
-          const arrowDirection2 = arrowSide !== null ? arrowSide : 'left';
-          toast.setAttribute('data-arrow', arrowDirection2);
-          console.log('Setting arrow direction:', arrowDirection2, 'for position:', position);
-          break;
-        case 'top':
-          console.log('TOP CASE: Entering top position case');
-          left = rect.left + rect.width / 2 - 150;
-          top = rect.top - 80;
-          const arrowDirection3 = arrowSide !== null ? arrowSide : 'down';
-          toast.setAttribute('data-arrow', arrowDirection3);
-          console.log('Setting arrow direction:', arrowDirection3, 'for position:', position);
-          break;
-        case 'bottom':
-          left = rect.left + rect.width / 2 - 150;
-          top = rect.bottom + 20;
-          const arrowDirection4 = arrowSide !== null ? arrowSide : 'up';
-          toast.setAttribute('data-arrow', arrowDirection4);
-          console.log('Setting arrow direction:', arrowDirection4, 'for position:', position);
-          break;
-        default:
-          left = rect.left + rect.width / 2 - 150;
-          top = rect.top + rect.height / 2 - 25;
-        // No arrow for center positioning
-      }
+// Simple toast notification function
+async function showCacheManager() {
+  try {
+    // Fetch cache stats from the public endpoint
+    const response = await fetch('/cache/public/entries');
+    const data = await response.json();
 
-      // Ensure toast stays within viewport
-      left = Math.max(20, Math.min(left, window.innerWidth - 320));
-      top = Math.max(20, Math.min(top, window.innerHeight - 80));
+    if (data.success) {
+      const entries = data.data.entries || [];
+      const totalEntries = entries.length;
+      const totalHits = entries.reduce((sum, entry) => sum + (entry.hit_count || 0), 0);
+      const avgHits = totalEntries > 0 ? (totalHits / totalEntries).toFixed(1) : 0;
 
-      // Apply custom offset if provided (after viewport constraints)
-      if (offset) {
-        left += offset.x || 0;
-        top += offset.y || 0;
-      }
+      // Create a simple stats popup
+      const statsHtml = `
+        <div style="padding: 20px; max-width: 400px;">
+          <h3>📊 Cache Statistics</h3>
+          <div style="margin: 15px 0;">
+            <strong>Total Cached Responses:</strong> ${totalEntries}<br>
+            <strong>Total Cache Hits:</strong> ${totalHits}<br>
+            <strong>Average Hits per Response:</strong> ${avgHits}<br>
+            <strong>Most Popular:</strong> ${
+              entries.length > 0 ? entries[0].question.substring(0, 50) + '...' : 'None'
+            }
+          </div>
+          <div style="margin-top: 20px; font-size: 12px; color: #666;">
+            💡 Cache helps reduce response time for repeated questions
+          </div>
+        </div>
+      `;
 
-      toast.style.position = 'fixed';
-      toast.style.left = left + 'px';
-
-      // Always use customTop/customBottom if provided, regardless of target
-      if (customTop !== null && customTop !== undefined) {
-        console.log('FINAL: Setting direct top position:', customTop + 'px');
-        toast.style.top = customTop + 'px';
-        toast.style.bottom = '';
-      } else if (customBottom !== null && customBottom !== undefined) {
-        console.log('FINAL: Setting direct bottom position:', customBottom + 'px');
-        toast.style.bottom = customBottom + 'px';
-        toast.style.top = '';
-      } else {
-        console.log('FINAL: Using calculated top position:', top + 'px');
-        toast.style.top = top + 'px';
-      }
-
-      // Set arrow position if provided
-      if (arrowX !== null && arrowX !== undefined) {
-        toast.style.setProperty('--arrow-x', arrowX + '%');
-      }
-
-      toast.style.zIndex = '1001';
+      // Show as a toast or alert
+      showToast(statsHtml, 'info', 5000);
+    } else {
+      showToast('Failed to load cache statistics', 'error');
     }
-  } else if (position === 'center') {
-    toast.style.position = 'fixed';
-    toast.style.left = '50%';
-    toast.style.top = '50%';
-    toast.style.transform = 'translate(-50%, -50%)';
-    toast.style.zIndex = '1001';
-    // No arrow for center positioning
-  } else if (position === 'top') {
-    console.log('Using screen edge positioning for top');
-    toast.style.position = 'fixed';
-    toast.style.left = '50%';
-    toast.style.top = '20px';
-    toast.style.transform = 'translateX(-50%)';
-    toast.style.zIndex = '1001';
-    // No arrow for screen edge positioning
-  } else if (position === 'bottom') {
-    toast.style.position = 'fixed';
-    toast.style.left = '50%';
-    toast.style.bottom = '20px';
-    toast.style.transform = 'translateX(-50%)';
-    toast.style.zIndex = '1001';
-    // No arrow for screen edge positioning
-  } else if (position === 'left') {
-    toast.style.position = 'fixed';
-    toast.style.left = '20px';
-    toast.style.top = '50%';
-    toast.style.transform = 'translateY(-50%)';
-    toast.style.zIndex = '1001';
-    // No arrow for screen edge positioning
-  } else if (position === 'right') {
-    toast.style.position = 'fixed';
-    toast.style.right = '20px';
-    toast.style.top = '50%';
-    toast.style.transform = 'translateY(-50%)';
-    toast.style.zIndex = '1001';
-    // No arrow for screen edge positioning
-  } else {
-    // Default: top right corner
-    toast.style.position = 'fixed';
-    toast.style.right = '20px';
-    toast.style.top = '20px';
-    toast.style.zIndex = '1001';
-    // No arrow for default positioning
+  } catch (error) {
+    console.error('Error loading cache stats:', error);
+    showToast('Error loading cache statistics', 'error');
+  }
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+  // Create toast container if it doesn't exist
+  let toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    document.body.appendChild(toastContainer);
   }
 
-  // Add animation class based on whether there are existing toasts
-  if (hasExistingToasts) {
-    toast.classList.add('fade-animation');
-  } else {
-    toast.classList.add('slide-animation');
-  }
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = `toast ${type} slide-animation`;
+  toast.innerHTML = `<div class="toast-text">${message}</div>`;
 
-  // Add to body instead of toast container to avoid container positioning issues
-  document.body.appendChild(toast);
+  // Add to container
+  toastContainer.appendChild(toast);
 
-  // Trigger animation
+  // Animate in
   setTimeout(() => {
     toast.classList.add('show');
   }, 10);
 
-  // Auto remove after duration (for sequence toasts, this will be overridden)
+  // Auto remove after duration
   setTimeout(() => {
     toast.classList.add('hide');
     setTimeout(() => {
@@ -3211,16 +4037,220 @@ function showPositionedToast(
       }
     }, 300);
   }, duration);
+}
 
-  // Click to dismiss
-  toast.addEventListener('click', () => {
-    toast.classList.add('hide');
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
+// Regenerate a response by sending the question again (without affecting cache)
+// Cache system removed - no more local storage caching
+
+// Add generated timestamp to a response (fresh or cached)
+async function addGeneratedTimestamp(messageElement, voiceB64 = null, isCached = false) {
+  // Create timestamp indicator
+  const timestampIndicator = document.createElement('div');
+  timestampIndicator.className = isCached ? 'cached-timestamp' : 'generated-timestamp';
+
+  const now = new Date();
+  const timestamp = now.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
   });
 
-  return toast;
+  // Get the current model from the server
+  let model = 'unknown';
+  try {
+    const response = await fetch('/cache/model-info');
+    const data = await response.json();
+    if (data.success && data.data?.model) {
+      model = data.data.model;
+    }
+  } catch (error) {
+    // Could not fetch model info
+  }
+
+  // Create timestamp content
+  if (isCached) {
+    timestampIndicator.innerHTML = `<span class="timestamp-text">💾 Cached response from ${model}</span>`;
+  } else {
+    timestampIndicator.innerHTML = `<span class="timestamp-text">🕐 Generated ${timestamp} by ${model}</span>`;
+  }
+
+  // Insert the timestamp at the beginning of the message
+  messageElement.insertBefore(timestampIndicator, messageElement.firstChild);
+
+  // Add regenerate button for cached responses
+  if (isCached) {
+    const regenerateButton = document.createElement('button');
+    regenerateButton.className = 'regenerate-btn';
+    regenerateButton.innerHTML = '🔄 Regenerate';
+    regenerateButton.title = 'Generate a fresh response';
+    regenerateButton.onclick = () => {
+      // Find the user's question from recent messages
+      const messages = document.querySelectorAll('.message');
+      const userMessages = Array.from(messages)
+        .filter((msg) => msg.classList.contains('user'))
+        .slice(-5); // Last 5 user messages
+
+      if (userMessages.length > 0) {
+        const lastUserMessage = userMessages[userMessages.length - 1];
+        const messageText = lastUserMessage.querySelector('.message-text');
+        if (messageText) {
+          const question = messageText.textContent.trim();
+          // Send the question again to generate a fresh response
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(
+              JSON.stringify({
+                type: 'chat_message',
+                data: {
+                  message: '@bot ' + question,
+                  displayName: window.displayName || currentUsername,
+                },
+              })
+            );
+          }
+        }
+      }
+    };
+
+    // Add the regenerate button to the timestamp container
+    timestampIndicator.appendChild(regenerateButton);
+  }
+
+  // Add TTS replay button at the end of the message if voice data is available
+  if (voiceB64) {
+    const replayButton = document.createElement('button');
+    replayButton.className = 'tts-replay-btn-small';
+    replayButton.innerHTML = '🔊';
+    replayButton.title = 'Replay TTS audio';
+    replayButton.onclick = () => replayTTS(voiceB64);
+
+    // Append the button to the end of the message
+    messageElement.appendChild(replayButton);
+  }
 }
+
+// Cache system removed - no more local storage caching
+
+// Function to replay TTS audio
+function replayTTS(voiceB64) {
+  try {
+    // Mark user interaction
+    if (!userHasInteracted) {
+      userHasInteracted = true;
+    }
+
+    // Create audio element from base64 data
+    const audio = new Audio('data:audio/wav;base64,' + voiceB64);
+
+    // Set audio properties
+    audio.volume = audioVolume;
+    audio.playbackRate = audioPlaybackRate;
+
+    // Play the audio
+    audio
+      .play()
+      .then(() => {
+        // TTS replay successful
+      })
+      .catch((error) => {
+        console.error('🔇 TTS replay failed:', error);
+        showToast('Failed to replay audio', 'error', 2000);
+      });
+  } catch (error) {
+    console.error('🔇 TTS replay error:', error);
+    showToast('Failed to replay audio', 'error', 2000);
+  }
+}
+
+// Sync frontend cache with backend cache
+// Cache system removed - no more local storage caching
+
+// Add tutorial styles to document
+const tutorialStyles = `
+.tutorial-toast {
+  background: rgba(52, 152, 219, 0.95);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  line-height: 1.4;
+  position: fixed;
+  z-index: 99999;
+  max-width: 300px;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: tutorialFadeIn 0.3s ease-out;
+  font-weight: 500;
+}
+
+@keyframes tutorialFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes arrowDraw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.tutorial-arrow {
+  animation: arrowDraw 0.5s ease-out 0.2s both;
+}
+
+.tutorial-content {
+  margin-bottom: 10px;
+}
+
+.tutorial-toast.info {
+  border-left: 4px solid #3498db;
+}
+
+.tutorial-toast.success {
+  border-left: 4px solid #2ecc71;
+}
+
+.tutorial-toast.warning {
+  border-left: 4px solid #f39c12;
+}
+
+.tutorial-toast.error {
+  border-left: 4px solid #e74c3c;
+}
+`;
+
+// Add styles to document when script loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = tutorialStyles;
+    document.head.appendChild(styleSheet);
+  });
+} else {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = tutorialStyles;
+  document.head.appendChild(styleSheet);
+}
+
+// Cleanup function for page unload
+function cleanup() {
+  clearTimers();
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1000, 'Page unload');
+  }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('unload', cleanup);

@@ -1,0 +1,705 @@
+{
+  "analysis_summary": {
+    "generated_at": "2025-07-22T05:34:34.009133",
+    "total_repositories": 49,
+    "repos_with_commits": 49,
+    "repos_with_python": 33,
+    "total_commits": 1520,
+    "recent_commits": 73,
+    "avg_commits_per_repo": 31
+  },
+  "python_statistics": {
+    "total_python_files": 250,
+    "total_python_lines": 25730,
+    "repos_with_python": 33,
+    "avg_lines_per_file": 102
+  },
+  "constructs": {
+    "if_statements": 1239,
+    "while_loops": 92,
+    "for_loops": 910,
+    "total_loops": 1002,
+    "regular_functions": 897,
+    "async_functions": 441,
+    "total_functions": 1338,
+    "classes": 315
+  },
+  "file_extensions": [
+    {
+      "extension": ".py",
+      "count": 250
+    },
+    {
+      "extension": ".json",
+      "count": 103
+    },
+    {
+      "extension": ".svelte",
+      "count": 86
+    },
+    {
+      "extension": ".js",
+      "count": 70
+    },
+    {
+      "extension": ".html",
+      "count": 54
+    },
+    {
+      "extension": ".md",
+      "count": 52
+    },
+    {
+      "extension": ".css",
+      "count": 46
+    },
+    {
+      "extension": ".ts",
+      "count": 40
+    },
+    {
+      "extension": ".gitignore",
+      "count": 33
+    },
+    {
+      "extension": ".txt",
+      "count": 33
+    },
+    {
+      "extension": ".java",
+      "count": 22
+    },
+    {
+      "extension": ".yml",
+      "count": 21
+    },
+    {
+      "extension": ".rst",
+      "count": 19
+    },
+    {
+      "extension": ".rs",
+      "count": 16
+    },
+    {
+      "extension": ".sh",
+      "count": 14
+    },
+    {
+      "extension": ".xml",
+      "count": 10
+    },
+    {
+      "extension": ".toml",
+      "count": 8
+    },
+    {
+      "extension": ".bat",
+      "count": 8
+    },
+    {
+      "extension": ".yaml",
+      "count": 7
+    },
+    {
+      "extension": ".svg",
+      "count": 7
+    },
+    {
+      "extension": ".sql",
+      "count": 7
+    },
+    {
+      "extension": ".ini",
+      "count": 6
+    },
+    {
+      "extension": ".go",
+      "count": 5
+    },
+    {
+      "extension": ".gradle",
+      "count": 4
+    },
+    {
+      "extension": ".pug",
+      "count": 2
+    },
+    {
+      "extension": ".scss",
+      "count": 2
+    },
+    {
+      "extension": ".properties",
+      "count": 2
+    },
+    {
+      "extension": ".Dockerfile",
+      "count": 2
+    },
+    {
+      "extension": ".env",
+      "count": 1
+    },
+    {
+      "extension": ".conf",
+      "count": 1
+    }
+  ],
+  "libraries": [
+    {
+      "library": "json",
+      "repository_count": 20
+    },
+    {
+      "library": "os",
+      "repository_count": 20
+    },
+    {
+      "library": "typing",
+      "repository_count": 16
+    },
+    {
+      "library": "fastapi",
+      "repository_count": 15
+    },
+    {
+      "library": "time",
+      "repository_count": 14
+    },
+    {
+      "library": "asyncio",
+      "repository_count": 14
+    },
+    {
+      "library": "dotenv",
+      "repository_count": 9
+    },
+    {
+      "library": "datetime",
+      "repository_count": 9
+    },
+    {
+      "library": "pathlib",
+      "repository_count": 8
+    },
+    {
+      "library": "random",
+      "repository_count": 8
+    },
+    {
+      "library": "re",
+      "repository_count": 8
+    },
+    {
+      "library": "pydantic",
+      "repository_count": 8
+    },
+    {
+      "library": "pytest",
+      "repository_count": 7
+    },
+    {
+      "library": "collections",
+      "repository_count": 7
+    },
+    {
+      "library": "logging",
+      "repository_count": 6
+    },
+    {
+      "library": "numpy",
+      "repository_count": 6
+    },
+    {
+      "library": "requests",
+      "repository_count": 5
+    },
+    {
+      "library": "dataclasses",
+      "repository_count": 5
+    },
+    {
+      "library": "websockets",
+      "repository_count": 5
+    },
+    {
+      "library": "uvicorn",
+      "repository_count": 5
+    },
+    {
+      "library": "pyautogui",
+      "repository_count": 4
+    },
+    {
+      "library": "aiohttp",
+      "repository_count": 4
+    },
+    {
+      "library": "gtts",
+      "repository_count": 4
+    },
+    {
+      "library": "bot",
+      "repository_count": 4
+    },
+    {
+      "library": "rpaudio",
+      "repository_count": 4
+    },
+    {
+      "library": "matplotlib",
+      "repository_count": 3
+    },
+    {
+      "library": "aiodesa",
+      "repository_count": 3
+    },
+    {
+      "library": "aiosqlite",
+      "repository_count": 3
+    },
+    {
+      "library": "threading",
+      "repository_count": 3
+    },
+    {
+      "library": "socket",
+      "repository_count": 3
+    },
+    {
+      "library": "sqlalchemy",
+      "repository_count": 3
+    },
+    {
+      "library": "base64",
+      "repository_count": 3
+    },
+    {
+      "library": "uuid",
+      "repository_count": 3
+    },
+    {
+      "library": "sys",
+      "repository_count": 3
+    },
+    {
+      "library": "signal",
+      "repository_count": 3
+    },
+    {
+      "library": "PIL",
+      "repository_count": 3
+    },
+    {
+      "library": "contextlib",
+      "repository_count": 3
+    },
+    {
+      "library": "httpx",
+      "repository_count": 3
+    },
+    {
+      "library": "psutil",
+      "repository_count": 3
+    },
+    {
+      "library": "secrets",
+      "repository_count": 2
+    },
+    {
+      "library": "playsound",
+      "repository_count": 2
+    },
+    {
+      "library": "urllib",
+      "repository_count": 2
+    },
+    {
+      "library": "pickle",
+      "repository_count": 2
+    },
+    {
+      "library": "selenium",
+      "repository_count": 2
+    },
+    {
+      "library": "jose",
+      "repository_count": 2
+    },
+    {
+      "library": "discord",
+      "repository_count": 2
+    },
+    {
+      "library": "twitchio",
+      "repository_count": 2
+    },
+    {
+      "library": "db",
+      "repository_count": 2
+    },
+    {
+      "library": "plotly",
+      "repository_count": 2
+    },
+    {
+      "library": "sqlite3",
+      "repository_count": 2
+    },
+    {
+      "library": "hashlib",
+      "repository_count": 2
+    },
+    {
+      "library": "pygame",
+      "repository_count": 2
+    },
+    {
+      "library": "configparser",
+      "repository_count": 2
+    },
+    {
+      "library": "itertools",
+      "repository_count": 2
+    },
+    {
+      "library": "tweepy",
+      "repository_count": 2
+    },
+    {
+      "library": "bs4",
+      "repository_count": 1
+    },
+    {
+      "library": "torch",
+      "repository_count": 1
+    },
+    {
+      "library": "pymongo",
+      "repository_count": 1
+    },
+    {
+      "library": "difflib",
+      "repository_count": 1
+    },
+    {
+      "library": "scheduler",
+      "repository_count": 1
+    },
+    {
+      "library": "importlib",
+      "repository_count": 1
+    },
+    {
+      "library": "speech_recognition",
+      "repository_count": 1
+    },
+    {
+      "library": "tkinter",
+      "repository_count": 1
+    },
+    {
+      "library": "hug",
+      "repository_count": 1
+    },
+    {
+      "library": "jsonifySettings",
+      "repository_count": 1
+    },
+    {
+      "library": "falcon",
+      "repository_count": 1
+    },
+    {
+      "library": "yattag",
+      "repository_count": 1
+    },
+    {
+      "library": "settings",
+      "repository_count": 1
+    },
+    {
+      "library": "setuptools",
+      "repository_count": 1
+    },
+    {
+      "library": "string",
+      "repository_count": 1
+    },
+    {
+      "library": "model",
+      "repository_count": 1
+    },
+    {
+      "library": "tensorflow",
+      "repository_count": 1
+    },
+    {
+      "library": "data_gen",
+      "repository_count": 1
+    },
+    {
+      "library": "palindrome_transformer",
+      "repository_count": 1
+    },
+    {
+      "library": "piper",
+      "repository_count": 1
+    },
+    {
+      "library": "wave",
+      "repository_count": 1
+    },
+    {
+      "library": "chromadb",
+      "repository_count": 1
+    },
+    {
+      "library": "io",
+      "repository_count": 1
+    },
+    {
+      "library": "sentence_transformers",
+      "repository_count": 1
+    },
+    {
+      "library": "jinja2",
+      "repository_count": 1
+    },
+    {
+      "library": "slugify",
+      "repository_count": 1
+    },
+    {
+      "library": "database",
+      "repository_count": 1
+    },
+    {
+      "library": "bit",
+      "repository_count": 1
+    },
+    {
+      "library": "game",
+      "repository_count": 1
+    },
+    {
+      "library": "items",
+      "repository_count": 1
+    },
+    {
+      "library": "robot",
+      "repository_count": 1
+    },
+    {
+      "library": "richer",
+      "repository_count": 1
+    },
+    {
+      "library": "player",
+      "repository_count": 1
+    },
+    {
+      "library": "config",
+      "repository_count": 1
+    },
+    {
+      "library": "game_state",
+      "repository_count": 1
+    },
+    {
+      "library": "math",
+      "repository_count": 1
+    },
+    {
+      "library": "enum",
+      "repository_count": 1
+    },
+    {
+      "library": "OIG",
+      "repository_count": 1
+    },
+    {
+      "library": "gym",
+      "repository_count": 1
+    },
+    {
+      "library": "stable_baselines3",
+      "repository_count": 1
+    },
+    {
+      "library": "wordcloud",
+      "repository_count": 1
+    },
+    {
+      "library": "github",
+      "repository_count": 1
+    },
+    {
+      "library": "pandas",
+      "repository_count": 1
+    },
+    {
+      "library": "pytz",
+      "repository_count": 1
+    },
+    {
+      "library": "imageio",
+      "repository_count": 1
+    },
+    {
+      "library": "models",
+      "repository_count": 1
+    },
+    {
+      "library": "pydirectinput",
+      "repository_count": 1
+    },
+    {
+      "library": "tomllib",
+      "repository_count": 1
+    },
+    {
+      "library": "main",
+      "repository_count": 1
+    },
+    {
+      "library": "utilities",
+      "repository_count": 1
+    },
+    {
+      "library": "sound",
+      "repository_count": 1
+    },
+    {
+      "library": "queue",
+      "repository_count": 1
+    },
+    {
+      "library": "sqlalchemy_utils",
+      "repository_count": 1
+    },
+    {
+      "library": "eyed3",
+      "repository_count": 1
+    },
+    {
+      "library": "jwt",
+      "repository_count": 1
+    },
+    {
+      "library": "mongoengine",
+      "repository_count": 1
+    },
+    {
+      "library": "ctypes",
+      "repository_count": 1
+    },
+    {
+      "library": "webbrowser",
+      "repository_count": 1
+    },
+    {
+      "library": "flask",
+      "repository_count": 1
+    },
+    {
+      "library": "comtypes",
+      "repository_count": 1
+    },
+    {
+      "library": "subprocess",
+      "repository_count": 1
+    },
+    {
+      "library": "codecs",
+      "repository_count": 1
+    },
+    {
+      "library": "stats",
+      "repository_count": 1
+    },
+    {
+      "library": "argparse",
+      "repository_count": 1
+    },
+    {
+      "library": "schedule",
+      "repository_count": 1
+    },
+    {
+      "library": "cv2",
+      "repository_count": 1
+    },
+    {
+      "library": "unidecode",
+      "repository_count": 1
+    },
+    {
+      "library": "nltk",
+      "repository_count": 1
+    },
+    {
+      "library": "connection_manager",
+      "repository_count": 1
+    },
+    {
+      "library": "mimetypes",
+      "repository_count": 1
+    },
+    {
+      "library": "dash_html_components",
+      "repository_count": 1
+    },
+    {
+      "library": "dash",
+      "repository_count": 1
+    },
+    {
+      "library": "dash_core_components",
+      "repository_count": 1
+    }
+  ],
+  "most_active_repositories": [
+    {
+      "repository": "rpaudio",
+      "commits": 648
+    },
+    {
+      "repository": "Terrace-Dashboard",
+      "commits": 166
+    },
+    {
+      "repository": "AIODesa",
+      "commits": 73
+    },
+    {
+      "repository": "AiMouseMovement",
+      "commits": 67
+    },
+    {
+      "repository": "Keystroke-Display",
+      "commits": 64
+    },
+    {
+      "repository": "pycourse",
+      "commits": 48
+    },
+    {
+      "repository": "EventBot",
+      "commits": 45
+    },
+    {
+      "repository": "PyProfileDataGen",
+      "commits": 38
+    },
+    {
+      "repository": "PortfolioAiChatBot",
+      "commits": 33
+    },
+    {
+      "repository": "ServerStats",
+      "commits": 33
+    }
+  ]
+}

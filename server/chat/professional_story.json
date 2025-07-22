@@ -1,0 +1,57 @@
+{
+  "title": "Bridging Power Systems and Code: My Journey as an ElectricianCoder",
+  "intro": "When I tell people I've spent the last dozen years wiring up missioncritical data centers by day and architecting WebSocket chat servers by night, they often laugh—and then ask how it all fits together. For me, it's simple: whether I'm retrofitting a servo press at an AWS facility or bootloading ZMK firmware on a custom split keyboard, I'm driven by the same impulse—solve realworld problems, then share what I've learned.",
+  "sections": [
+    {
+      "heading": "From Circuit Breakers to Circuit Boards",
+      "content": [
+        "My career began on the factory floor and in cavernous electrical rooms, where reliability is everything."
+      ],
+      "bullets": [
+        "Retrofitted servo presses with modern safety interlocks.",
+        "Designed redundant power systems (ATS, inverters, generators) at Google and AWS data centers.",
+        "Built Excelbased QA trackers that log every anomaly and streamline punchlist signoff."
+      ]
+    },
+    {
+      "heading": "Writing Firmware, Rust, and FastAPI Backends",
+      "content": ["Offshift, I channel that same rigor into software:"],
+      "bullets": [
+        "Embedded firmware for ESP32 and ATmega modules—sensor I/O, control loops, even custom TTS data pipelines.",
+        "Rust libraries exposed to Python via PyO3/Maturin, giving me the best of both worlds: speed and ease of use.",
+        "FastAPI WebSocket backends with JWT auth and endtoend encryption, powering realtime chat apps and local RAGstyle assistants."
+      ]
+    },
+    {
+      "heading": "Teaching, Streaming, and Community",
+      "content": ["What really lights me up is passing knowledge forward."],
+      "bullets": [
+        "Produced YouTube tutorials on building a local LLM assistant and endtoend encrypted chat apps.",
+        "Streamed coding sessions on Twitch—debugging live, answering questions, and mentoring newer developers.",
+        "Hung out on Reddit, where \"help desk\" threads have become impromptu teaching moments."
+      ]
+    },
+    {
+      "heading": "My Toolbox of Skills",
+      "bullets": [
+        "HeavyDuty Electrical: ATS, inverters, generators, QA tracking",
+        "Embedded & Systems: ESP32/ATmega firmware, NBTdriven Minecraft mods",
+        "FullStack Dev: FastAPI, WebSockets, Svelte/React frontends",
+        "DevOps & Deployment: GitHub Actions, Nginx/DuckDNS, Supabase",
+        "AI/ML: Palindrome classifiers (LSTM/GRU/Transformer), TTS training",
+        "Community & Content: YouTube tutorials, Twitch streams, Reddit mentoring"
+      ]
+    },
+    {
+      "heading": "What's Next?",
+      "content": [
+        "I'm always on the lookout for the next puzzle—whether it's a stubborn encoder that needs reflashing, a WebRTC stream that refuses to connect, or a junior dev who needs a friendly nudge. If that sounds like your next challenge—or if you just want to chat about servo press safety, Python async tips, or Twitch overlays—drop a comment below or ping me on stream. Let's learn together!"
+      ]
+    }
+  ],
+  "youtube_tutorials": [
+    "https://youtu.be/olWPT9V6tuw",
+    "https://youtu.be/wIbybhfvkVE",
+    "https://youtu.be/wgontWHx4jw"
+  ]
+}

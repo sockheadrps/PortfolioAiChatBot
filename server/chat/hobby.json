@@ -79,5 +79,61 @@
       "Used onboard headers and terminals for clean integration with external LED strip and power supply.",
       "Explored durability and thermal characteristics of the board under continuous RGB fading cycles."
     ]
+  },
+  {
+    "name": "Custom Lily58 Split Keyboard Build",
+    "type": "hobby",
+    "description": "Built a fully hand assembled Lily58 split mechanical keyboard from a bare PCB—soldering 116 tiny SMD diodes, switches, USB C & TRRS jacks, and an nRF52840 microcontroller; bootloaded and flashed custom ZMK firmware; crafted multi layer keymaps and macros; and developed a React/WebSocket front end to visualize real time keypresses and available keys per layer, accelerating muscle memory training.",
+    "skills": [
+      "PCB Assembly",
+      "SMD Diode Soldering",
+      "Mechanical Switch Soldering",
+      "Microcontroller Bootloading",
+      "ZMK Firmware Configuration",
+      "Keymap & Macro Design",
+      "Embedded Systems Programming",
+      "WebSocket Integration",
+      "Front-End Development",
+      "UI/UX Design"
+    ],
+    "code_url": "",
+    "image": "/assets/hobby/kbd",
+    "notes": [
+      "Cleaned and prepped the bare Lily58 PCB with flux for optimal solder flow.",
+      "Hand soldered 116 tiny SMD diodes with correct polarity to establish the key matrix.",
+      "Installed and soldered mechanical switches, USB C & TRRS jacks, and the nRF52840 MCU module.",
+      "Bootloaded the nRF52840 using SWD and flashed custom ZMK firmware via UF2.",
+      "Authored ZMK keymap configs defining QWERTY, symbol, navigation, and numpad layers with macros.",
+      "Tested and fine tuned macros in firmware to ensure reliable multi key sequences.",
+      "Built a WebSocket app with vanilla HTML, CSS, and JavaScript to stream and display real time key events and layer availability.",
+      "Added UI overlays and tooltips to highlight active layers and guide muscle memory training."
+    ]
+  },
+  {
+    "name": "Custom Hydroponic Hot Pepper LED Grow Light",
+    "type": "hobby",
+    "description": "Designed and assembled a bespoke LED grow light on a stock aluminum heatsink—hand mounting monochromatic diodes and high power Cree COB modules, calculating and sizing constant current drivers, soldering heavy gauge wiring, and optimizing thermal management for indoor hydroponic hot pepper cultivation.",
+    "skills": [
+      "Heatsink Fabrication",
+      "Thermal Interface Materials",
+      "Cree COB and Monochromatic LED Integration",
+      "LED Driver Sizing",
+      "Constant Current Driver Configuration",
+      "Power Wiring & Routing",
+      "Soldering & Assembly",
+      "Indoor Horticultural Lighting Design",
+      "Hydroponic System Optimization"
+    ],
+    "code_url": "",
+    "image": "/assets/hobby/led",
+    "notes": [
+      "Machined and drilled a stock aluminum heatsink to accommodate LED star boards and COB modules.",
+      "Selected and configured constant current drivers based on calculated forward voltage and current requirements.",
+      "Hand soldered Cree COB LEDs and discrete monochromatic diodes onto heavy copper star PCBs.",
+      "Applied high performance thermal paste and mechanically fastened LEDs to ensure optimal heat transfer.",
+      "Routed and secured power and signal wiring using heat shrink tubing and cable clips for strain relief.",
+      "Tested individual LED channels for correct current delivery and spectrum output before full assembly.",
+      "Monitored operating temperatures under continuous duty and adjusted airflow to maintain safe junction temps."
+    ]
   }
 ]

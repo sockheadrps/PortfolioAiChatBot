@@ -12,6 +12,7 @@ from chromadb.config import Settings
 from datetime import datetime
 from server.db.db import SessionLocal
 from server.db.dbmodels import ChatHistory
+import time
 
 # ========== CONFIGURATION ==========
 # WebSocket Endpoints - Configure your chat connections here
@@ -23,8 +24,8 @@ WEBSOCKET_CONFIG = {
     "PRODUCTION_WS_URL": "wss://chat.socksthoughtshop.lol/ws",
 
     # Current active URL (should match frontend)
-    "ACTIVE_WS_URL": "ws://localhost:8080/ws"
-    # "ACTIVE_WS_URL": "wss://chat.socksthoughtshop.lol/ws"
+    # "ACTIVE_WS_URL": "ws://localhost:8080/ws"
+    "ACTIVE_WS_URL": "wss://chat.socksthoughtshop.lol/ws"
 }
 
 # Ollama Configuration - Customize your AI model settings here
@@ -32,8 +33,12 @@ OLLAMA_CONFIG = {
     # Ollama API URL
     "API_URL": "http://localhost:11434/api/generate",
 
-    # Model name (options: mistral, tinyllama, llama2, llama3.2, codellama, deepseek-r1:latest, etc.)
-    "MODEL": "llama3.2",
+    # Model name (options: mistral, tinyllama, llama2, llama3:latest, llama3.2:latest, etc.)
+    "MODEL": "llama3.2:latest",
+    # "MODEL": "llama3.2:latest",
+    # "MODEL": "gemma3:12b",
+    # "MODEL": "tinyllama:latest",
+
 
     # Request timeout in seconds
     "TIMEOUT": 300,
@@ -47,7 +52,10 @@ PROMPT_CONFIG = {
     "CURRENT_STYLE": "default",
 
     "STYLES": {
-        "default": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience.
+        "default": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience. You may also answer questions that are just general inquiries about Ryan's life, and who he is, and how he got to where he is today.
+
+
+BACKGROUND: Ryan is primarily an electrician by trade with extensive electrical engineering experience. His software projects are passion and personal projects, not his main profession. When discussing his work skills and work experience, prioritize his electrical work as his primary professional background.
 
 IMPORTANT: Only respond to questions about:
 - Programming/software projects (Python, JavaScript, FastAPI, etc.)
@@ -58,7 +66,32 @@ IMPORTANT: Only respond to questions about:
 
 For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics.
 
+RESPONSE STYLE: Be engaging, detailed, and interesting. Tell stories about the projects, explain the technical challenges, highlight unique aspects, and make the responses feel personal and compelling. Use specific details from the context to paint a vivid picture of Ryan's work and skills. Don't just list facts - explain the impact he had, the problem-solving approach he took, and what makes each project special. Keep responses concise and focused - aim for 150-250 words maximum to maintain engagement and clarity.
+
+CRITICAL: Use ONLY the facts and details provided in the context. Do not invent specific stories, locations, or scenarios that aren't explicitly mentioned. If the context mentions general environments (like "hospitals"), don't create specific stories about individual cases unless they're explicitly detailed in the context.
+
+FORMATTING: Use plain text only - no markdown formatting, no asterisks, no bold text. Write in a natural, conversational style that flows well in a chat interface.
+
 For software/programming projects, include any available GitHub links if present in the context. For electrical, manufacturing, or hardware projects, focus on the technical skills and experience rather than code repositories.
+
+
+    Context:
+    {context}
+
+    Answer this: {query}
+""",
+        "llama3.2": """You are Ryan's personal portfolio assistant. You ONLY answer questions about Ryan's professional work, projects, skills, and technical experience.
+
+IMPORTANT: Only respond to questions about:
+- Programming/software projects (Python, JavaScript, FastAPI, etc.)
+- Electrical engineering work (QA, manufacturing, AIDA press projects, TEGG work)
+- Hardware/hobby projects (PCBs, electronics, guitars, etc.)
+- Technical skills and professional experience
+- Development tools, technologies, and methodologies used
+
+For anything else (cooking, general life advice, non-technical topics), politely decline and redirect to portfolio topics.
+
+For software/programming projects, include any available GitHub links if present in the context. For electrical, manufacturing, or hardware projects, focus on the technical skills and experience rather than code repositories. Dont send youtube links though.
 
 Use ONLY the facts provided in the context below. Do not make up information.
 
@@ -66,7 +99,7 @@ Use ONLY the facts provided in the context below. Do not make up information.
     {context}
 
     Answer this: {query}
-"""
+    """
     }
 }
 
@@ -123,21 +156,69 @@ class PortfolioAssistant:
                 return []
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+                # Handle both single objects and arrays
+                if isinstance(data, dict):
+                    # Single object - wrap in list
+                    data = [data]
+                elif not isinstance(data, list):
+                    print(
+                        f"❌ Invalid data format in {path}: expected dict or list")
+                    return []
+
                 if default_type:
                     for proj in data:
-                        proj.setdefault("type", default_type)
+                        if isinstance(proj, dict):
+                            proj.setdefault("type", default_type)
+                        else:
+                            print(
+                                f"❌ Invalid project format in {path}: expected dict")
+                            return []
                 return data
 
-        print("📁 Loading software, electrical, and hobby projects...")
+        print("📁 Loading software, electrical, hobby, professional profile, and professional story projects...")
         software_projects = load_file(
             "server/chat/projects.json", default_type="software")
         electrical_projects = load_file(
             "server/chat/electrical.json", default_type="electrical")
         hobby_projects = load_file(
             "server/chat/hobby.json", default_type="hobby")
+        professional_profile = load_file(
+            "server/chat/professional_profile.json", default_type="professional")
+        professional_story = load_file(
+            "server/chat/professional_story.json", default_type="professional_story")
 
-        self.projects = software_projects + electrical_projects + hobby_projects
+        self.projects = software_projects + electrical_projects + \
+            hobby_projects + professional_profile + professional_story
         print(f"✅ Loaded {len(self.projects)} total projects")
+
+        # Debug: Print all electrical projects to verify AIDA is loaded
+        electrical_projects_names = [
+            p.get('name', 'Unknown') for p in electrical_projects]
+        print(
+            f"[DEBUG] Electrical projects loaded: {electrical_projects_names}")
+
+        # Debug: Print professional story to verify it's loaded
+        professional_story_names = [
+            p.get('title', p.get('name', 'Unknown')) for p in professional_story]
+        print(
+            f"[DEBUG] Professional story loaded: {professional_story_names}")
+
+        # Debug: Print all project types
+        project_types = [p.get('type', 'unknown') for p in self.projects]
+        type_counts = {}
+        for ptype in project_types:
+            type_counts[ptype] = type_counts.get(ptype, 0) + 1
+        print(f"[DEBUG] Project type counts: {type_counts}")
+
+        # Test YouTube gallery command generation
+        for proj in self.projects:
+            if proj.get("type") == "professional_story" and proj.get("youtube_tutorials"):
+                print(
+                    f"[DEBUG] Testing YouTube gallery for: {proj.get('title', 'Professional Story')}")
+                test_command = self._create_youtube_gallery(
+                    proj.get("youtube_tutorials"), proj.get("title", "Professional Story"))
+                print(f"[DEBUG] Test YouTube gallery command: {test_command}")
+                break
 
     def list_hobby_projects(self) -> str:
         hobbies = [proj for proj in self.projects if proj.get(
@@ -379,6 +460,10 @@ class PortfolioAssistant:
                     else:
                         return "Sorry, I couldn't load the images for these projects."
 
+                # Handle programming report modal
+                elif button_id == "show_programming_report":
+                    return "📊 Here's a detailed analysis of my programming portfolio:\n\n[SHOW_PROGRAMMING_REPORT]"
+
         except (ValueError, IndexError):
             pass
 
@@ -573,11 +658,13 @@ class PortfolioAssistant:
     def _get_file_hash(self) -> str:
         """Generate hash of all projects files for cache invalidation."""
         try:
-            # Include all three JSON files in the hash calculation
+            # Include all JSON files in the hash calculation
             file_paths = [
                 "server/chat/projects.json",
                 "server/chat/electrical.json",
-                "server/chat/hobby.json"
+                "server/chat/hobby.json",
+                "server/chat/professional_profile.json",
+                "server/chat/professional_story.json"
             ]
 
             combined_content = b""
@@ -647,6 +734,24 @@ class PortfolioAssistant:
             # Check if collection already has data
             if self.collection.count() > 0:
                 print("🚀 ChromaDB collection already populated with embeddings")
+                # Force regeneration if we have new project types
+                project_types = [p.get('type', 'unknown')
+                                 for p in self.projects]
+                if 'professional_story' in project_types:
+                    print("🔄 Professional story detected - forcing cache regeneration")
+                    try:
+                        # Get all document IDs and delete them
+                        results = self.collection.get()
+                        if results and results['ids']:
+                            self.collection.delete(ids=results['ids'])
+                            print("🗑️ Cleared existing ChromaDB collection")
+                        else:
+                            print("ℹ️ Collection was already empty")
+                    except Exception as e:
+                        print(f"❌ Could not clear collection: {e}")
+                        print("🔄 Continuing with existing data...")
+                else:
+                    print("✅ No new project types - skipping regeneration")
                 return
 
             print("📊 Generating and caching embeddings...")
@@ -654,19 +759,93 @@ class PortfolioAssistant:
             # Create corpus texts
             corpus_texts = []
             for proj in self.projects:
-                text = f"""Project: {proj['name']}
-                    Description: {proj['description']}
-                    Skills: {", ".join(proj.get("skills", []))}
-                    Code URL: {proj.get("code_url", "N/A")}
-                    Notes:
-                    - """ + "\n- ".join(proj['notes'])
+                if proj.get("type") == "professional_story":
+                    # Handle professional story format with sections
+                    text = f"""Project: {proj.get('title', 'Professional Story')}
+                        Intro: {proj.get('intro', '')}
+                        """
+
+                    # Add sections
+                    for section in proj.get("sections", []):
+                        text += f"\n{section.get('heading', '')}:"
+                        for content in section.get("content", []):
+                            text += f"\n{content}"
+                        for bullet in section.get("bullets", []):
+                            text += f"\n- {bullet}"
+
+                    # Add YouTube tutorials
+                    if proj.get("youtube_tutorials"):
+                        text += f"\nYouTube Tutorials: {', '.join(proj['youtube_tutorials'])}"
+
+                    corpus_texts.append(text.strip())
+                else:
+                    # Handle regular project format
+                    text = f"""Project: {proj['name']}
+                        Description: {proj['description']}
+                        Skills: {", ".join(proj.get("skills", []))}
+                        Code URL: {proj.get("code_url", "N/A")}
+                        Notes:
+                        - """ + "\n- ".join(proj['notes'])
+
+                    # Add additional fields for professional profiles
+                    if proj.get("type") == "professional":
+                        if proj.get("youtube_tutorials"):
+                            text += f"\nYouTube Tutorials: {', '.join(proj['youtube_tutorials'])}"
+
+                        # Add image if present
                 if proj.get("image"):
                     text += f"\nImage: {proj['image']}"
+
                 corpus_texts.append(text.strip())
+
+            # Debug: Check if corpus_texts and projects have the same length
+            print(
+                f"[DEBUG] Projects count: {len(self.projects)}, Corpus texts count: {len(corpus_texts)}")
+            if len(corpus_texts) != len(self.projects):
+                print(
+                    f"⚠️ WARNING: Mismatch between projects ({len(self.projects)}) and corpus texts ({len(corpus_texts)})")
+                # Ensure they have the same length by truncating or padding
+                if len(corpus_texts) > len(self.projects):
+                    print(
+                        f"⚠️ Truncating corpus_texts from {len(corpus_texts)} to {len(self.projects)}")
+                    corpus_texts = corpus_texts[:len(self.projects)]
+                else:
+                    print(
+                        f"⚠️ Padding corpus_texts from {len(corpus_texts)} to {len(self.projects)}")
+                    while len(corpus_texts) < len(self.projects):
+                        corpus_texts.append("")
 
             # Check for cached embeddings
             embedding_cache_file = self.cache_dir / \
                 f"embeddings_{self._get_file_hash()}.pkl"
+
+            # Force cache regeneration if we have professional story
+            project_types = [p.get('type', 'unknown') for p in self.projects]
+            if 'professional_story' in project_types and embedding_cache_file.exists():
+                print("🔄 Professional story detected - clearing embedding cache")
+                try:
+                    embedding_cache_file.unlink()
+                    print("🗑️ Deleted embedding cache file")
+                except Exception as e:
+                    print(f"⚠️ Could not delete cache file: {e}")
+
+            # Also force ChromaDB regeneration if we have professional story with YouTube tutorials
+            if 'professional_story' in project_types:
+                for proj in self.projects:
+                    if proj.get("type") == "professional_story" and proj.get("youtube_tutorials"):
+                        print(
+                            "🔄 Professional story with YouTube tutorials detected - forcing ChromaDB regeneration")
+                        try:
+                            # Get all document IDs and delete them
+                            results = self.collection.get()
+                            if results and results['ids']:
+                                self.collection.delete(ids=results['ids'])
+                                print(
+                                    "🗑️ Cleared existing ChromaDB collection for YouTube tutorials")
+                            break
+                        except Exception as e:
+                            print(f"❌ Could not clear collection: {e}")
+                            print("🔄 Continuing with existing data...")
 
             if embedding_cache_file.exists():
                 print("🚀 Loading cached embeddings...")
@@ -693,24 +872,81 @@ class PortfolioAssistant:
 
             # Add to ChromaDB in batches for better performance
             batch_size = 10
-            for i in range(0, len(corpus_texts), batch_size):
+            # Use the length of projects, not corpus_texts, to avoid index errors
+            total_projects = len(self.projects)
+            for i in range(0, total_projects, batch_size):
                 batch_texts = corpus_texts[i:i+batch_size]
                 batch_embeddings = embeddings[i:i+batch_size]
                 batch_ids = [f"proj_{j}" for j in range(
-                    i, min(i+batch_size, len(corpus_texts)))]
+                    i, min(i+batch_size, total_projects))]
 
                 # Create metadata for each project including type
                 batch_metadatas = []
-                for j in range(i, min(i+batch_size, len(corpus_texts))):
+                for j in range(i, min(i+batch_size, total_projects)):
+                    if j >= len(self.projects):
+                        print(
+                            f"⚠️ Index {j} out of range for projects (len={len(self.projects)})")
+                        continue
                     project = self.projects[j]
-                    metadata = {
-                        "type": project.get("type", "software"),
-                        "name": project.get("name", f"Project {j}"),
-                        "code_url": project.get("code_url", ""),
-                        "skills": ", ".join(project.get("skills", [])),
-                        "image": project.get("image", "")
-                    }
+
+                    # Handle different project types
+                    if project.get("type") == "professional_story":
+                        youtube_tutorials_raw = project.get(
+                            "youtube_tutorials", [])
+                        print(
+                            f"[DEBUG] Raw YouTube tutorials for professional story: {youtube_tutorials_raw}")
+                        youtube_tutorials_str = ", ".join(
+                            youtube_tutorials_raw)
+                        print(
+                            f"[DEBUG] YouTube tutorials string: '{youtube_tutorials_str}'")
+
+                        metadata = {
+                            "type": project.get("type", "professional_story"),
+                            "name": project.get("title", f"Professional Story {j}"),
+                            "code_url": "",
+                            "skills": "",
+                            "image": "",
+                            "youtube_tutorials": youtube_tutorials_str
+                        }
+                        print(
+                            f"[DEBUG] Created metadata for professional story: {metadata}")
+                    else:
+                        metadata = {
+                            "type": project.get("type", "software"),
+                            "name": project.get("name", f"Project {j}"),
+                            "code_url": project.get("code_url", ""),
+                            "skills": ", ".join(project.get("skills", [])),
+                            "image": project.get("image", "")
+                        }
+
+                        # Add additional metadata for professional profiles
+                        if project.get("type") == "professional":
+                            if project.get("youtube_tutorials"):
+                                metadata["youtube_tutorials"] = ", ".join(
+                                    project["youtube_tutorials"])
+                                print(
+                                    f"[DEBUG] Added YouTube tutorials to professional metadata: {metadata['youtube_tutorials']}")
+
                     batch_metadatas.append(metadata)
+
+                    # Debug: Show batch array lengths
+                    print(
+                        f"[DEBUG] Batch {i//batch_size + 1}: texts={len(batch_texts)}, embeddings={len(batch_embeddings)}, metadatas={len(batch_metadatas)}, ids={len(batch_ids)}")
+
+                    # Only add to ChromaDB if we have valid data
+                    if batch_texts and batch_embeddings and batch_metadatas:
+                        # Ensure all arrays have the same length
+                        min_length = min(len(batch_texts), len(
+                            batch_embeddings), len(batch_metadatas), len(batch_ids))
+                        if min_length != len(batch_texts):
+                            print(
+                                f"⚠️ Truncating batch arrays to length {min_length} (texts: {len(batch_texts)}, embeddings: {len(batch_embeddings)}, metadatas: {len(batch_metadatas)}, ids: {len(batch_ids)})")
+
+                        # Truncate all arrays to the minimum length
+                        batch_texts = batch_texts[:min_length]
+                        batch_embeddings = batch_embeddings[:min_length]
+                        batch_metadatas = batch_metadatas[:min_length]
+                        batch_ids = batch_ids[:min_length]
 
                 self.collection.add(
                     documents=batch_texts,
@@ -719,8 +955,8 @@ class PortfolioAssistant:
                     metadatas=batch_metadatas
                 )
 
-            print(
-                f"✅ Added {len(corpus_texts)} projects to ChromaDB (optimized)")
+                print(
+                    f"✅ Added {len(corpus_texts)} projects to ChromaDB (optimized)")
 
         except Exception as e:
             print(f"❌ Error populating database: {e}")
@@ -783,12 +1019,25 @@ class PortfolioAssistant:
             return []
 
         # First, try direct name matching for exact project names
+        print(
+            f"[DEBUG] Trying direct project matching for: '{question}' (filter: {filter_type})")
         direct_matches = self._find_direct_project_matches(
             question, filter_type)
         if direct_matches:
             print(
                 f"🎯 Found direct project name match: {[m['metadata']['name'] for m in direct_matches]}")
+            # Debug: Check metadata for YouTube tutorials
+            for idx, match in enumerate(direct_matches):
+                print(
+                    f"[DEBUG] Direct match {idx} metadata: {match['metadata']}")
+                if match['metadata'].get('type') in ['professional_story', 'professional']:
+                    youtube_tutorials = match['metadata'].get(
+                        'youtube_tutorials', '')
+                    print(
+                        f"[DEBUG] Direct match {idx} YouTube tutorials: '{youtube_tutorials}'")
             return direct_matches[:top_k]
+        else:
+            print(f"[DEBUG] No direct matches found, falling back to semantic search")
 
         try:
             q_embedding = self.model.encode(
@@ -827,13 +1076,57 @@ class PortfolioAssistant:
         """Find projects by direct name matching and skill-based matching before falling back to semantic search."""
         question_lower = question.lower().strip()
 
+        # Special handling for LED/horticulture queries - prioritize LED grow light project
+        if any(word in question_lower for word in ["led", "horticulture", "grow light", "hydroponic"]):
+            print(f"[DEBUG] Looking for LED horticulture project...")
+            for i, project in enumerate(self.projects):
+                project_name = project.get('name', '').lower()
+                project_type = project.get('type', '')
+                project_skills = " ".join(project.get("skills", [])).lower()
+
+                print(
+                    f"[DEBUG] Checking project {i}: {project.get('name', 'Unknown')} (type: {project_type})")
+                print(f"[DEBUG] Project name: '{project_name}'")
+                print(f"[DEBUG] Project skills: '{project_skills}'")
+
+                # Look specifically for the LED grow light project
+                if (project_type == "hobby" and
+                        "custom hydroponic hot pepper led grow light" in project_name):
+
+                    print(
+                        f"[DEBUG] Found LED horticulture project: {project['name']}")
+                    # Create the same format as ChromaDB results for LED project
+                    text = f"""Project: {project['name']}
+                        Description: {project['description']}
+                        Skills: {", ".join(project.get("skills", []))}
+                        Code URL: {project.get("code_url", "N/A")}
+                        Notes:
+                        - """ + "\n- ".join(project.get('notes', []))
+
+                    return [{
+                        "text": text.strip(),
+                        "metadata": {
+                            "type": project.get("type", "hobby"),
+                            "name": project.get("name", f"Project {i}"),
+                            "code_url": project.get("code_url", ""),
+                            "skills": ", ".join(project.get("skills", [])),
+                            "image": project.get("image", "")
+                        }
+                    }]
+            print(f"[DEBUG] No LED horticulture project found in direct search")
+
         # Special handling for manufacturing queries - prioritize AIDA project
         if "manufacturing" in question_lower and filter_type == "electrical":
+            print(f"[DEBUG] Looking for AIDA manufacturing project...")
             for i, project in enumerate(self.projects):
+                print(
+                    f"[DEBUG] Checking project {i}: {project.get('name', 'Unknown')} (type: {project.get('type', 'Unknown')})")
                 if (project.get("type") == "electrical" and
                     "aida" in project.get("name", "").lower() and
                         "manufacturing" in " ".join(project.get("skills", [])).lower()):
 
+                    print(
+                        f"[DEBUG] Found AIDA manufacturing project: {project['name']}")
                     # Create the same format as ChromaDB results for AIDA project
                     text = f"""Project: {project['name']}
                         Description: {project['description']}
@@ -852,6 +1145,81 @@ class PortfolioAssistant:
                             "image": project.get("image", "")
                         }
                     }]
+            print(f"[DEBUG] No AIDA manufacturing project found in direct search")
+
+        # Special handling for professional profile queries
+        if any(word in question_lower for word in ["professional", "profile", "background", "experience", "career", "resume", "cv", "about you", "your background"]):
+            print(f"[DEBUG] Looking for professional profile...")
+            for i, project in enumerate(self.projects):
+                if project.get("type") == "professional":
+                    print(
+                        f"[DEBUG] Found professional profile: {project['name']}")
+                    # Create the same format as ChromaDB results for professional profile
+                    text = f"""Project: {project['name']}
+                        Description: {project['description']}
+                        Skills: {", ".join(project.get("skills", []))}
+                        Code URL: {project.get("code_url", "N/A")}
+                        Notes:
+                        - """ + "\n- ".join(project.get('notes', []))
+
+                    # Add YouTube tutorials if available
+                    if project.get("youtube_tutorials"):
+                        text += f"\nYouTube Tutorials: {', '.join(project['youtube_tutorials'])}"
+
+                    return [{
+                        "text": text.strip(),
+                        "metadata": {
+                            "type": project.get("type", "professional"),
+                            "name": project.get("name", f"Project {i}"),
+                            "code_url": project.get("code_url", ""),
+                            "skills": ", ".join(project.get("skills", [])),
+                            "image": project.get("image", ""),
+                            "youtube_tutorials": ", ".join(project.get("youtube_tutorials", []))
+                        }
+                    }]
+            print(f"[DEBUG] No professional profile found in direct search")
+
+        # Special handling for professional story queries
+        if any(word in question_lower for word in ["story", "journey", "path", "how did you", "how did you get", "your story", "your journey", "electrician coder", "bridging", "power systems and code"]):
+            print(f"[DEBUG] Looking for professional story...")
+            print(f"[DEBUG] Question: '{question_lower}'")
+            print(
+                f"[DEBUG] Available project types: {[p.get('type', 'unknown') for p in self.projects]}")
+            for i, project in enumerate(self.projects):
+                print(
+                    f"[DEBUG] Checking project {i}: type={project.get('type', 'unknown')}, title={project.get('title', 'N/A')}")
+                if project.get("type") == "professional_story":
+                    print(
+                        f"[DEBUG] Found professional story: {project.get('title', 'Professional Story')}")
+                    # Create the same format as ChromaDB results for professional story
+                    text = f"""Project: {project.get('title', 'Professional Story')}
+                        Intro: {project.get('intro', '')}
+                        """
+
+                    # Add sections
+                    for section in project.get("sections", []):
+                        text += f"\n{section.get('heading', '')}:"
+                        for content in section.get("content", []):
+                            text += f"\n{content}"
+                        for bullet in section.get("bullets", []):
+                            text += f"\n- {bullet}"
+
+                    # Add YouTube tutorials if available
+                    if project.get("youtube_tutorials"):
+                        text += f"\nYouTube Tutorials: {', '.join(project['youtube_tutorials'])}"
+
+                    return [{
+                        "text": text.strip(),
+                        "metadata": {
+                            "type": project.get("type", "professional_story"),
+                            "name": project.get("title", f"Professional Story {i}"),
+                            "code_url": "",
+                            "skills": "",
+                            "image": "",
+                            "youtube_tutorials": ", ".join(project.get("youtube_tutorials", []))
+                        }
+                    }]
+            print(f"[DEBUG] No professional story found in direct search")
 
         # Remove common query words to extract project name
         query_words = ["what", "is", "tell", "me",
@@ -897,178 +1265,158 @@ class PortfolioAssistant:
 
         return matches
 
-    def ask_ollama_stream(self, query: str, matches: List[str], user_id: str = "default", filter_type: str = None) -> Iterator[str]:
-        """Generate streaming response using Ollama HTTP API with relevant project context."""
-        print(f"[📤] Sending prompt to Ollama model: {OLLAMA_CONFIG['MODEL']}")
+    def ask_ollama_stream(
+        self,
+        query: str,
+        matches: List[dict],
+        user_id: str = "default",
+        filter_type: Optional[str] = None
+    ) -> Iterator[str]:
+        """Generate a streaming response using Ollama HTTP API with project context."""
+        print(f"[📤] Prompt → Ollama model {OLLAMA_CONFIG['MODEL']}")
+
+        if not matches:
+            yield self._get_fallback_response(query)
+            return
+
+        projects_with_images = self._extract_project_images(matches, top_n=2)
+        if projects_with_images:
+            self.current_project_images = projects_with_images
+
+        context = self._build_context(matches)
+        prompt = self._format_prompt(context, query)
+
+        yield "[STATUS|Passing data to LLM...]"
         try:
-            if not matches:
-                yield self._get_fallback_response(query)
-                return
-
-            # Check if any matches have images - be selective based on query type
-            projects_with_images = []
-            query_lower = query.lower()
-
-            # Show images for visual requests OR when asking about experience/projects in domains that have images
-            should_show_images = any(phrase in query_lower for phrase in [
-                "show me", "images", "pictures", "photos", "visual", "see the", "look at",
-                "projects he built", "project showcases", "manufacturing projects",
-                "hobby projects", "electronics projects", "hardware projects",
-                "press projects", "assembly projects", "view projects",
-                # Experience-based queries that should show images if available
-                "manufacturing experience", "electrical experience", "hardware experience",
-                "manufacturing", "press", "assembly", "servo", "aida", "electrical qa",
-                "hobby", "hobbies", "electronics", "pcb"
-            ])
-
-            # Detect if this is a broad project listing query
-            is_broad_query = any(phrase in query_lower for phrase in [
-                "programming projects", "software projects", "projects", "portfolio",
-                "all projects", "what projects", "work on", "built", "developed"
-            ])
-
-            # Only populate images if the query specifically requests visual information
-            if should_show_images:
-                if is_broad_query:
-                    # For broad queries, check multiple matches for images
-                    for m in matches[:2]:  # Only consider top 2 most relevant matches
-                        image_path = m['metadata'].get('image', '')
-                        project_name = m['metadata'].get('name', '').lower()
-
-                        # Skip projects that don't match the query context
-                        if any(word in query_lower for word in ["manufacturing", "press", "assembly", "tonnage", "aida", "servo"]):
-                            # For manufacturing queries, prefer AIDA project
-                            if "tegg" in project_name and "aida" not in project_name:
-                                continue
-                        elif any(word in query_lower for word in ["electrical", "qa", "infrared", "tegg", "thermal"]):
-                            # For electrical QA queries, prefer TEGG project
-                            if "aida" in project_name and "tegg" not in project_name:
-                                continue
-
-                        if image_path and image_path.strip():
-                            projects_with_images.append({
-                                'name': m['metadata'].get('name', 'Project'),
-                                'image': image_path
-                            })
-                else:
-                    # For specific project queries, only show images if the TOP/most relevant match has images
-                    if matches and len(matches) > 0:
-                        top_match = matches[0]
-                        image_path = top_match['metadata'].get('image', '')
-                        if image_path and image_path.strip():
-                            projects_with_images.append({
-                                'name': top_match['metadata'].get('name', 'Project'),
-                                'image': image_path
-                            })
-
-            # Store image data globally for button clicks (shared across all users)
-            if projects_with_images:
-                self.current_project_images = projects_with_images
-
-            # Create context from matches
-            context_parts = []
-            for m in matches:
-                text = m['text']
-                github_url = m['metadata'].get('code_url', '')
-                image_path = m['metadata'].get('image', '')
-                project_type = m['metadata'].get('type', '')
-                project_name = m['metadata'].get('name', 'Project')
-
-                # Only include GitHub for software/programming projects
-                github_line = ""
-                if project_type == "software" and github_url and github_url != "N/A":
-                    github_line = f"\nGitHub: {github_url}"
-                    print(f"🔍 GitHub URL: {github_line}")
-
-                # Create context entry without GitHub for non-software projects
-                context_parts.append(
-                    f"Project: {project_name}\n"
-                    f"{text}{github_line}\n"
-                )
-
-            context = "\n---\n".join(context_parts)
-
-            # Use current active prompt style
-            current_style = PROMPT_CONFIG["CURRENT_STYLE"]
-            prompt_template = PROMPT_CONFIG["STYLES"][current_style]
-            prompt = prompt_template.format(context=context, query=query)
-
-            # Call Ollama HTTP API with streaming
-            payload = {
-                "model": OLLAMA_CONFIG["MODEL"],
-                "prompt": prompt,
-                "stream": OLLAMA_CONFIG["STREAM"]
-            }
-
-            # Send initial status
-            yield f"[STATUS|Passing data to LLM...]"
-
-            try:
-                response = requests.post(
-                    OLLAMA_CONFIG["API_URL"],
-                    json=payload,
-                    stream=True,
-                    timeout=OLLAMA_CONFIG["TIMEOUT"]
-                )
-
-                if response.status_code == 200:
-                    buffer = ""
-                    response_complete = False
-                    chunks_received = 0
-
-                    # Send "connected" status when we start receiving data
-                    yield f"[STATUS|Generating response...]"
-
-                    for line in response.iter_lines():
-                        if line:
-                            try:
-                                data = json.loads(line.decode('utf-8'))
-
-                                if 'response' in data:
-                                    chunk = data['response']
-                                    buffer += chunk
-                                    chunks_received += 1
-
-                                    # Send status update every 10 chunks
-                                    if chunks_received % 10 == 0:
-                                        yield f"[STATUS|Generated {chunks_received} chunks...]"
-
-                                    # Yield complete words/sentences for smoother display
-                                    if chunk in [' ', '.', '!', '?', '\n'] or len(buffer) >= 10:
-                                        yield buffer
-                                        buffer = ""
-
-                                # Check if generation is done
-                                if data.get('done', False):
-                                    if buffer:  # Yield any remaining content
-                                        yield buffer
-                                    response_complete = True
-                                    break
-
-                            except json.JSONDecodeError:
-                                continue
-
-                    # Add image button if response completed successfully and we have images
-                    if response_complete and projects_with_images:
-                        yield "\n\n[BUTTON|view_project_images|View Images]"
-
-                    # save query and response to db
-                    self.save_query_and_response(query, buffer, user_id)
-
-                else:
-                    print(f"❌ Ollama HTTP error: {response.status_code}")
-                    yield self._get_simple_response(matches, query)
-
-            except requests.exceptions.ConnectionError:
-                print("❌ Cannot connect to Ollama - is it running?")
-                yield self._get_simple_response(matches, query)
-            except requests.exceptions.Timeout:
-                print("⏰ Ollama request timed out")
-                yield "I'm thinking about that... Could you try asking again in a moment?"
-
-        except Exception as e:
-            print(f"❌ Error with Ollama streaming: {e}")
+            response = requests.post(
+                OLLAMA_CONFIG["API_URL"],
+                json={"model": OLLAMA_CONFIG["MODEL"],
+                      "prompt": prompt, "stream": True},
+                stream=True,
+                timeout=OLLAMA_CONFIG["TIMEOUT"],
+            )
+        except (requests.ConnectionError, requests.Timeout) as e:
+            print(f"❌ Ollama request failed: {e}")
             yield self._get_simple_response(matches, query)
+            return
+
+        if response.status_code != 200:
+            print(f"❌ Ollama HTTP {response.status_code}")
+            yield self._get_simple_response(matches, query)
+            return
+
+            yield "[STATUS|Generating response...]"
+
+        # Stream the response and collect the full text simultaneously
+        full_response = ""
+        for chunk in self._stream_response(response):
+            # Extract actual text content from status chunks
+            if not chunk.startswith("[STATUS|"):
+                full_response += chunk
+            yield chunk
+
+        # Append image‑gallery button only if we have actual images
+        if projects_with_images and len(projects_with_images) > 0:
+            # Double-check that we have valid image paths
+            valid_images = [
+                img for img in projects_with_images if img.get("image", "").strip()]
+            if valid_images:
+                yield "\n\n[BUTTON|view_project_images|View Images]"
+
+        # Insert YouTube gallery if applicable
+        youtube_added = self._maybe_append_youtube_gallery(
+            matches, full_response)
+        if youtube_added:
+            yield f"\n\n{youtube_added}"
+
+        # Finally save the response
+        self.save_query_and_response(query, full_response, user_id)
+
+    # — Helpers —
+
+    def _extract_project_images(self, matches: List[dict], top_n: int) -> List[dict]:
+        imgs = []
+        for m in matches[:top_n]:
+            img = m["metadata"].get("image", "").strip()
+            if img:
+                imgs.append({
+                    "name": m["metadata"].get("name", "Project"),
+                    "image": img
+                })
+        return imgs
+
+    def _build_context(self, matches: List[dict]) -> str:
+        parts = []
+        for m in matches:
+            md = m["metadata"]
+            lines = [f"Project: {md.get('name', 'Project')}"]
+            lines.append(m["text"])
+            if md.get("type") == "software" and md.get("code_url"):
+                lines.append(f"GitHub: {md['code_url']}")
+            if md.get("type") in ("professional", "professional_story") and md.get("youtube_tutorials"):
+                lines.append(f"YouTube Tutorials: {md['youtube_tutorials']}")
+            parts.append("\n".join(lines))
+        return "\n---\n".join(parts)
+
+    def _format_prompt(self, context: str, query: str) -> str:
+        style = PROMPT_CONFIG["CURRENT_STYLE"]
+        template = PROMPT_CONFIG["STYLES"][style]
+        return template.format(context=context, query=query)
+
+    def _stream_response(self, response: requests.Response) -> Iterator[str]:
+        """
+        Stream response chunks from Ollama.
+        """
+        buffer = ""
+        count = 0
+
+        for chunk in response.iter_lines(decode_unicode=True):
+            if not chunk:
+                continue
+            data = json.loads(chunk)
+            text = data.get("response", "")
+            buffer += text
+            count += 1
+
+            # periodic status
+            if count % 10 == 0:
+                yield f"[STATUS|Generated {count} chunks...]"
+
+            # flush on punctuation or length
+            if text in (" ", ".", "!", "?", "\n") or len(buffer) >= 10:
+                yield buffer
+                buffer = ""
+
+            if data.get("done"):
+                if buffer:
+                    yield buffer
+                    break
+
+    def _collect_full_response(self, response: requests.Response) -> str:
+        """
+        Collect the full response text from Ollama without streaming.
+        """
+        full_text = ""
+        for chunk in response.iter_lines(decode_unicode=True):
+            if not chunk:
+                continue
+            data = json.loads(chunk)
+            text = data.get("response", "")
+            full_text += text
+
+            if data.get("done"):
+                break
+
+        return full_text
+
+    def _maybe_append_youtube_gallery(self, matches: List[dict], full_text: str) -> Optional[str]:
+        for m in matches:
+            if m["metadata"].get("type") in ("professional", "professional_story"):
+                vids = m["metadata"].get("youtube_tutorials", "")
+                urls = [u.strip() for u in vids.split(",") if u.strip()]
+                if urls:
+                    return self._create_youtube_gallery(urls, m["metadata"].get("name", "Project"))
+        return None
 
     def _get_simple_response(self, matches: List[Dict[str, Any]], query: str) -> str:
         if not matches:
@@ -1077,18 +1425,85 @@ class PortfolioAssistant:
         match = matches[0]
         meta = match.get("metadata", {})
         project_name = meta.get("name", "a project")
+        project_type = meta.get("type", "software")
         skills = meta.get("skills", "").split(", ")[:3]
         code_url = meta.get("code_url")
         image = meta.get("image")
+        youtube_tutorials = meta.get("youtube_tutorials", "")
 
-        response = f"I worked on {project_name}, which involved {', '.join(skills)}."
+        print(f"[DEBUG] _get_simple_response - project_type: {project_type}")
+        print(
+            f"[DEBUG] _get_simple_response - youtube_tutorials: {youtube_tutorials}")
 
-        # Always include GitHub link if available (and not empty/N/A)
-        if code_url and code_url != "N/A" and code_url.strip():
-            response += f"\n\n**GitHub:** {code_url}"
+        # Handle different project types
+        if project_type == "professional_story":
+            # For professional story, return the full text content
+            response = match.get("text", "")
+
+            # Add YouTube gallery if available
+            if youtube_tutorials:
+                # Parse URLs and filter out empty ones
+                if isinstance(youtube_tutorials, str):
+                    youtube_urls = [
+                        url.strip() for url in youtube_tutorials.split(",") if url.strip()]
+                else:
+                    youtube_urls = youtube_tutorials
+
+                if youtube_urls:  # Only proceed if we have valid URLs
+                    print(
+                        f"[DEBUG] Creating YouTube gallery with URLs: {youtube_urls}")
+                    gallery_command = self._create_youtube_gallery(
+                        youtube_urls, project_name)
+                    print(
+                        f"[DEBUG] YouTube gallery command: {gallery_command}")
+                    response += f"\n\n{gallery_command}"
+                else:
+                    print(f"[DEBUG] No valid YouTube URLs found")
+            else:
+                print(f"[DEBUG] No YouTube tutorials in metadata")
+
+            return response
+
+        elif project_type == "professional":
+            # For professional profile, return the full text content
+            response = match.get("text", "")
+
+            # Add YouTube gallery if available
+            if youtube_tutorials:
+                # Parse URLs and filter out empty ones
+                if isinstance(youtube_tutorials, str):
+                    youtube_urls = [
+                        url.strip() for url in youtube_tutorials.split(",") if url.strip()]
+                else:
+                    youtube_urls = youtube_tutorials
+
+                if youtube_urls:  # Only proceed if we have valid URLs
+                    print(
+                        f"[DEBUG] Creating YouTube gallery with URLs: {youtube_urls}")
+                    gallery_command = self._create_youtube_gallery(
+                        youtube_urls, project_name)
+                    print(
+                        f"[DEBUG] YouTube gallery command: {gallery_command}")
+                    response += f"\n\n{gallery_command}"
+                else:
+                    print(f"[DEBUG] No valid YouTube URLs found")
+            else:
+                print(f"[DEBUG] No YouTube tutorials in metadata")
+
+            return response
+        else:
+            # For regular projects
+            response = f"I worked on {project_name}, which involved {', '.join(skills)}."
+
+            # Always include GitHub link if available (and not empty/N/A)
+            if code_url and code_url != "N/A" and code_url.strip():
+                response += f"\n\n**GitHub:** {code_url}"
 
         if image:
             response += f"\n\nImages available: {image}"
+            # Add button for viewing images
+            response += "\n\n[BUTTON|view_project_images|View Images]"
+
         return response
 
     def _get_fallback_response(self, query: str) -> str:
@@ -1102,6 +1517,71 @@ class PortfolioAssistant:
 
         import random
         return random.choice(fallbacks)
+
+    def _create_youtube_links(self, text: str) -> str:
+        """Convert YouTube URLs to clickable links in the text."""
+        import re
+
+        # Pattern to match YouTube URLs
+        youtube_pattern = r'https://youtu\.be/([a-zA-Z0-9_-]+)'
+
+        def replace_youtube_url(match):
+            video_id = match.group(1)
+            return f'[YouTube Video](https://youtu.be/{video_id})'
+
+        # Replace YouTube URLs with clickable links
+        text = re.sub(youtube_pattern, replace_youtube_url, text)
+
+        return text
+
+    def _clean_thinking_tags(self, text: str) -> str:
+        """Remove any thinking tags that might have been generated by the LLM."""
+        import re
+
+        # Remove common thinking tags and their content
+        patterns = [
+            r'<think>.*?</think>',  # <think>...</think>
+            r'<reasoning>.*?</reasoning>',  # <reasoning>...</reasoning>
+            r'<thought>.*?</thought>',  # <thought>...</thought>
+            r'<analysis>.*?</analysis>',  # <analysis>...</analysis>
+            r'<step>.*?</step>',  # <step>...</step>
+            r'<process>.*?</process>',  # <process>...</process>
+        ]
+
+        cleaned_text = text
+        for pattern in patterns:
+            cleaned_text = re.sub(pattern, '', cleaned_text,
+                                  flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove any remaining thinking tag markers
+        cleaned_text = re.sub(r'<[^>]*think[^>]*>',
+                              '', cleaned_text, flags=re.IGNORECASE)
+
+        # Handle incomplete thinking tags (like <think> without closing tag)
+        cleaned_text = re.sub(r'<think>.*', '', cleaned_text,
+                              flags=re.DOTALL | re.IGNORECASE)
+        cleaned_text = re.sub(r'<reasoning>.*', '',
+                              cleaned_text, flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove thinking patterns that don't use tags
+        thinking_patterns = [
+            r'hmm,.*?(?=\n|$)',  # "Hmm, the user is asking..."
+            r'looking at.*?(?=\n|$)',  # "Looking at the context..."
+            r'i should.*?(?=\n|$)',  # "I should structure the response..."
+            r'the user is asking.*?(?=\n|$)',  # "The user is asking about..."
+        ]
+
+        for pattern in thinking_patterns:
+            cleaned_text = re.sub(pattern, '', cleaned_text,
+                                  flags=re.DOTALL | re.IGNORECASE)
+
+        # Clean up extra whitespace and excessive line breaks
+        cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
+        # Normalize whitespace
+        cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+        cleaned_text = cleaned_text.strip()
+
+        return cleaned_text
 
     def _get_off_topic_response(self, query: str) -> str:
         """Provide response when question is not portfolio-related."""
@@ -1120,12 +1600,60 @@ class PortfolioAssistant:
         import random
         return random.choice(responses)
 
+    def get_response(self, query: str, user_id: str = "default") -> str:
+        """Get a single response string (non-streaming) for the bot."""
+        print(
+            f"[DEBUG] get_response called with query: '{query}' for user: {user_id}")
+        try:
+            # Try to get a direct match first (faster)
+            direct_matches = self._find_direct_project_matches(query)
+            print(f"[DEBUG] Direct matches: {direct_matches}")
+            if direct_matches:
+                print(f"[DEBUG] Found direct matches, using simple response")
+                return self._get_simple_response(direct_matches, query)
+
+            # If no direct match, try the full pipeline with timeout protection
+            print(f"[DEBUG] No direct matches, trying full pipeline...")
+
+            # Get the response stream and collect all chunks with timeout
+            response_chunks = []
+            import time
+            start_time = time.time()
+            timeout = 30  # 30 second timeout
+
+            for chunk in self.get_response_stream(query, user_id):
+                if time.time() - start_time > timeout:
+                    print(f"[DEBUG] Timeout reached, returning partial response")
+                    break
+                print(f"[DEBUG] Got chunk: '{chunk[:50]}...'")
+                response_chunks.append(chunk)
+
+            # Join all chunks into a single response
+            full_response = ''.join(response_chunks)
+            print(f"[DEBUG] Full response length: {len(full_response)}")
+
+            if not full_response.strip():
+                print(f"[DEBUG] Empty response, using fallback")
+            return self._get_fallback_response(query)
+
+            return full_response
+
+        except Exception as e:
+            print(f"❌ Error in get_response: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._get_fallback_response(query)
+
     def get_response_stream(self, query: str, user_id: str = "default") -> Iterator[str]:
         """Main optimized method to get a streaming response to a query, with hobby handling."""
+        print(
+            f"[DEBUG] get_response_stream called with query: '{query}' for user: {user_id}")
 
         # Check for button clicks first
         button_result = self.handle_button_click(query, user_id)
         if button_result:
+            print(
+                f"[DEBUG] Button click handled, returning: {button_result[:50]}...")
             yield button_result
             return
 
@@ -1133,13 +1661,16 @@ class PortfolioAssistant:
         self.current_project_images = []
 
         if not self.projects:
+            print(f"[DEBUG] No projects loaded, using fallback")
             yield self._get_fallback_response(query)
             return
 
         user_state = self.get_user_state(user_id)
+        print(f"[DEBUG] User state: {user_state}")
 
         # If waiting for user to pick a hobby, check if this is actually a hobby selection
         if user_state.get("awaiting_hobby_choice"):
+            print(f"[DEBUG] User is awaiting hobby choice")
             # Check if the query looks like a hobby selection (number or hobby name match)
             cleaned_query = query.strip().lower()
             hobby_projects = user_state.get("last_hobby_list", [])
@@ -1157,13 +1688,8 @@ class PortfolioAssistant:
                 result = self.handle_hobby_selection(query, user_id)
                 yield result or "Please click a 'View Photos' button to see project details."
                 return
-            else:
-                # This is a different question, clear the hobby state and continue processing
-                print(
-                    f"[DEBUG] Clearing hobby state for unrelated query: {query}")
-                user_state["awaiting_hobby_choice"] = False
-                user_state["last_hobby_list"] = []
-                # Continue processing the new query below
+        else:
+            print(f"[DEBUG] User is not awaiting hobby choice")
 
         # If user asked about hobbies - expanded detection
         hobby_keywords = [
@@ -1173,22 +1699,28 @@ class PortfolioAssistant:
             "tell me about his hobbies", "hardware work", "electronics work"
         ]
         if any(keyword in query.lower() for keyword in hobby_keywords):
+            print(f"[DEBUG] Hobby keywords detected, handling hobby list")
             yield self.handle_hobby_list(user_id)
             return
 
         # Intercept software/project list questions and respond with predefined text
         if any(kw in query.lower() for kw in [
             "programming projects", "software projects", "code projects", "python projects",
-            "what projects has he built", "list his projects", "developer projects"
+            "what projects has he built", "list his projects", "developer projects",
+            "programming languages", "languages", "what languages", "programming language"
         ]):
+            print(
+                f"[DEBUG] Software project keywords detected, using predefined response")
             yield from self._predefined_software_projects()
             return
 
         # Check if the query is portfolio-related before processing
         if not self.is_portfolio_related(query):
+            print(f"[DEBUG] Query not portfolio-related, using off-topic response")
             yield self._get_off_topic_response(query)
             return
 
+        print(f"[DEBUG] Query is portfolio-related, proceeding with full processing")
         try:
             filter_type = self.infer_filter_type(query)
             print(
@@ -1202,6 +1734,8 @@ class PortfolioAssistant:
 
             # Use more results for broad queries
             top_k = 6 if is_broad_query else 3
+            print(
+                f"[DEBUG] Querying portfolio with top_k={top_k}, filter_type={filter_type}")
             matches = self.query_portfolio(
                 query, top_k=top_k, filter_type=filter_type)
             print(
@@ -1211,6 +1745,8 @@ class PortfolioAssistant:
             yield from self.ask_ollama_stream(query, matches, user_id, filter_type)
         except Exception as e:
             print(f"❌ Error getting streaming response: {e}")
+            import traceback
+            traceback.print_exc()
             yield self._get_fallback_response(query)
 
     def _predefined_software_projects(self) -> Iterator[str]:
@@ -1223,7 +1759,8 @@ class PortfolioAssistant:
             "3. **FastAPI WebSocket Chat App**: A modern real-time chat application built with FastAPI, WebSockets, SQLite, and vanilla JS, utilizing skills such as FastAPI, WebSockets, Authentication, SQLite, JWT, Passlib, Bcrypt, RSA, Pydantic, Jinja2, SQLAlchemy, and JavaScript.\n"
             "https://github.com/sockheadrps/websocketchat\n\n"
             "4. **rpaudio**: A Rust-based Python library for non-blocking audio playback with a simple API, designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.\n"
-            "https://github.com/sockheadrps/rpaudio"
+            "https://github.com/sockheadrps/rpaudio\n\n"
+            "[BUTTON|show_programming_report|View Detailed Programming Report]"
         )
 
     def is_portfolio_related(self, question: str) -> bool:
@@ -1288,6 +1825,14 @@ class PortfolioAssistant:
             return "software"
         if any(word in q for word in ["hardware", "hobby", "hobbies", "pcb", "etching", "soldering", "prototyping", "embedded", "microcontroller", "midi", "ble", "rgb", "led", "strip", "guitar", "overlay", "effects", "musical", "interface", "design"]):
             return "hobby"
+
+        # Professional profile queries
+        if any(word in q for word in ["professional", "profile", "background", "experience", "career", "resume", "cv", "about you", "your background", "work history", "professional experience", "skills", "expertise", "qualifications"]):
+            return "professional"
+
+        # Professional story queries
+        if any(word in q for word in ["story", "journey", "path", "how did you", "how did you get", "your story", "your journey", "electrician coder", "bridging", "power systems and code", "mission critical", "data centers", "servo press"]):
+            return "professional_story"
 
         return None  # fallback to no filter
 
@@ -1354,3 +1899,78 @@ class PortfolioAssistant:
         cls._model_cache = None
         cls._chroma_client = None
         print("🧹 Cleaned up cached resources")
+
+    def _create_youtube_gallery(self, youtube_urls, project_name):
+        """Create a YouTube gallery command for the frontend to handle"""
+        print(
+            f"[DEBUG] _create_youtube_gallery called with URLs: {youtube_urls}, project: {project_name}")
+
+        if not youtube_urls:
+            print("[DEBUG] No YouTube URLs provided")
+            return ""
+
+        # Ensure youtube_urls is a list, not a string
+        if isinstance(youtube_urls, str):
+            youtube_urls = [youtube_urls]
+
+        # Filter out empty or invalid URLs
+        valid_urls = []
+        for url in youtube_urls:
+            if url and url.strip() and url.strip() != "":
+                valid_urls.append(url.strip())
+
+        if not valid_urls:
+            print("[DEBUG] No valid YouTube URLs found after filtering")
+            return ""
+
+        if len(valid_urls) == 1:
+            # Single video - send gallery command
+            command = f"[YOUTUBE_SHOW|{valid_urls[0]}|{project_name}]"
+        else:
+            # Multiple videos - send gallery command with pipe-separated URLs
+            videos_str = "||".join(valid_urls)
+            command = f"[YOUTUBE_SHOW|{videos_str}|{project_name}]"
+
+        print(f"[DEBUG] Created YouTube gallery command: {command}")
+        return command
+
+    def _stream_and_collect_single_pass(self, response: requests.Response) -> tuple[Iterator[str], str]:
+        """
+        Stream response chunks and collect full text in a single pass.
+        Returns (chunk_generator, full_text)
+        """
+        chunks = []
+        full_text = ""
+        buffer = ""
+        count = 0
+
+        for chunk in response.iter_lines(decode_unicode=True):
+            if not chunk:
+                continue
+            data = json.loads(chunk)
+            text = data.get("response", "")
+            buffer += text
+            full_text += text
+            count += 1
+
+            # periodic status
+            if count % 10 == 0:
+                status_chunk = f"[STATUS|Generated {count} chunks...]"
+                chunks.append(status_chunk)
+
+            # flush on punctuation or length
+            if text in (" ", ".", "!", "?", "\n") or len(buffer) >= 10:
+                chunks.append(buffer)
+                buffer = ""
+
+            if data.get("done"):
+                if buffer:
+                    chunks.append(buffer)
+                    full_text += buffer
+                break
+
+        def replay_generator():
+            for chunk in chunks:
+                yield chunk
+
+        return replay_generator(), full_text

@@ -31,7 +31,13 @@ class ConnectionManager:
             del self.active_connections[username]
 
     async def send_message(self, message: str, websocket: WebSocket):
-        await websocket.send_json(message)
+        await websocket.send_json({
+            "event": "chat_message",
+            "data": {
+                "user": "System",
+                "message": message
+            }
+        })
 
     async def broadcast(self, message: str):
         # Create a copy of connections to avoid modification during iteration
@@ -57,13 +63,15 @@ class ConnectionManager:
 
     async def broadcast_user_list(self):
         usernames = list(self.active_connections.keys())
-        message = UserListMessage(users=usernames)
         # Create a copy of connections to avoid modification during iteration
         connections_copy = list(self.active_connections.items())
 
         for username, ws in connections_copy:
             try:
-                await ws.send_json(message.model_dump(by_alias=True))
+                await ws.send_json({
+                    "type": "user_list",
+                    "users": usernames
+                })
             except Exception:
                 # Connection is closed, remove it from active connections
                 if username in self.active_connections:
@@ -122,5 +130,4 @@ class ConnectionManager:
             print(f"📊 Recorded connection: {username} from {ip_address}")
         except Exception as e:
             print(f"❌ Error recording connection: {e}")
-        finally:
             db.close()

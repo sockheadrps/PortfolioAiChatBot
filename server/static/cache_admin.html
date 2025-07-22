@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cache Management</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        color: white;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .section {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .section h2 {
+        margin-top: 0;
+        color: #ffd700;
+        border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        padding-bottom: 10px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #e0e0e0;
+      }
+
+      input[type='text'],
+      textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      input[type='text']::placeholder,
+      textarea::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      button {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        margin-right: 10px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .danger {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+      }
+
+      .success {
+        background: linear-gradient(135deg, #27ae60, #2ecc71);
+      }
+
+      .warning {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+      }
+
+      .info {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+      }
+
+      .status {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      .status.success {
+        background: rgba(39, 174, 96, 0.2);
+        border: 1px solid rgba(39, 174, 96, 0.4);
+        color: #2ecc71;
+      }
+
+      .status.error {
+        background: rgba(231, 76, 60, 0.2);
+        border: 1px solid rgba(231, 76, 60, 0.4);
+        color: #e74c3c;
+      }
+
+      .status.info {
+        background: rgba(52, 152, 219, 0.2);
+        border: 1px solid rgba(52, 152, 219, 0.4);
+        color: #3498db;
+      }
+
+      .cache-entries {
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 15px;
+      }
+
+      .cache-entry {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+      }
+
+      .cache-entry.collapsed {
+        padding: 10px 15px;
+      }
+
+      .cache-entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .cache-entry-header:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 5px;
+        margin: -5px;
+      }
+
+      .cache-entry-title {
+        flex: 1;
+        margin: 0;
+        color: #ffd700;
+        font-size: 16px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cache-entry-toggle {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        padding: 4px 8px;
+        color: white;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-left: 10px;
+      }
+
+      .cache-entry-toggle:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .cache-entry-details {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: block;
+      }
+
+      .cache-entry.collapsed .cache-entry-details {
+        display: none;
+      }
+
+      .entry-controls {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .entry-controls button {
+        margin: 0;
+      }
+
+      .search-controls {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        gap: 10px;
+      }
+
+      .cache-entry.hidden {
+        display: none;
+      }
+
+      .cache-entry h3 {
+        margin: 0 0 10px 0;
+        color: #ffd700;
+        font-size: 16px;
+      }
+
+      .cache-entry p {
+        margin: 5px 0;
+        color: #e0e0e0;
+        font-size: 14px;
+      }
+
+      .cache-entry p strong {
+        color: #ffd700;
+      }
+
+      .cache-entry .model-info {
+        background: rgba(52, 152, 219, 0.2);
+        border: 1px solid rgba(52, 152, 219, 0.3);
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        display: inline-block;
+      }
+
+      .cache-entry .actions {
+        margin-top: 10px;
+      }
+
+      .cache-entry .actions button {
+        padding: 8px 16px;
+        font-size: 12px;
+        margin-right: 8px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .stat-card h3 {
+        margin: 0 0 10px 0;
+        color: #ffd700;
+        font-size: 18px;
+      }
+
+      .stat-card .value {
+        font-size: 24px;
+        font-weight: bold;
+        color: white;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        color: #ffd700;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .recent-activity {
+        margin-top: 20px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 15px;
+      }
+
+      .recent-activity h3 {
+        margin: 0 0 15px 0;
+        color: #ffd700;
+        font-size: 16px;
+      }
+
+      .activity-log {
+        max-height: 200px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        padding: 10px;
+      }
+
+      .activity-item {
+        padding: 8px 12px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: monospace;
+      }
+
+      .activity-hit {
+        background: rgba(39, 174, 96, 0.2);
+        border-left: 3px solid #27ae60;
+        color: #2ecc71;
+      }
+
+      .activity-miss {
+        background: rgba(231, 76, 60, 0.2);
+        border-left: 3px solid #e74c3c;
+        color: #e74c3c;
+      }
+
+      .activity-add {
+        background: rgba(52, 152, 219, 0.2);
+        border-left: 3px solid #3498db;
+        color: #3498db;
+      }
+
+      .activity-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .activity-item:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      .activity-item.expanded {
+        background: rgba(255, 255, 255, 0.15) !important;
+      }
+
+      .response-preview {
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        font-size: 11px;
+        line-height: 1.4;
+        max-height: 100px;
+        overflow-y: auto;
+        border-left: 2px solid #ffd700;
+        display: none;
+      }
+
+      .response-preview.show {
+        display: block;
+      }
+
+      /* Modal Styles */
+      .modal {
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(5px);
+      }
+
+      .modal-content {
+        background: rgba(20, 20, 20, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        margin: 5% auto;
+        padding: 0;
+        width: 80%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .modal-header h3 {
+        margin: 0;
+        color: #ffd700;
+        font-size: 18px;
+        max-width: 70%;
+        word-wrap: break-word;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
+
+      .close-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .modal-body {
+        padding: 20px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+
+      .response-content {
+        color: #e0e0e0;
+        line-height: 1.6;
+        font-size: 14px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      /* Edit Form Styles */
+      .edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .edit-form label {
+        color: #ffd700;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .edit-form textarea {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 15px;
+        resize: vertical;
+        min-height: 300px;
+      }
+
+      .edit-form textarea:focus {
+        outline: none;
+        border-color: #ffd700;
+        box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+      }
+
+      .edit-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 10px;
+      }
+
+      .edit-actions button {
+        min-width: 120px;
+      }
+
+      .secondary {
+        background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Cache Management</h1>
+
+      <div id="status" class="status" style="display: none"></div>
+
+      <!-- Cache Status -->
+      <div class="section">
+        <h2>📊 Cache Status</h2>
+        <div class="stats" id="stats">
+          <div class="stat-card">
+            <h3>Total Entries</h3>
+            <div class="value" id="total-entries">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Cache File Size</h3>
+            <div class="value" id="cache-size">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Status</h3>
+            <div class="value" id="cache-status">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Current Model</h3>
+            <div class="value" id="current-model">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Model Distribution</h3>
+            <div class="value" id="model-distribution">-</div>
+          </div>
+        </div>
+        <button onclick="loadCacheStatus()" class="success">🔄 Refresh Status</button>
+      </div>
+
+      <!-- Cache Statistics -->
+      <div class="section">
+        <h2>📈 Cache Performance</h2>
+        <div class="stats" id="performance-stats">
+          <div class="stat-card">
+            <h3>Cache Hit Rate</h3>
+            <div class="value" id="hit-rate">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Hits</h3>
+            <div class="value" id="total-hits">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Misses</h3>
+            <div class="value" id="total-misses">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Memory Saved</h3>
+            <div class="value" id="memory-saved">-</div>
+          </div>
+        </div>
+        <div class="recent-activity">
+          <h3>🕒 Recent Activity</h3>
+          <div id="recent-activity" class="activity-log"></div>
+        </div>
+        <button onclick="loadCacheStats()" class="success">🔄 Refresh Stats</button>
+      </div>
+
+      <!-- Add Cache Entry -->
+      <div class="section">
+        <h2>➕ Add Cache Entry</h2>
+        <div class="form-group">
+          <label for="question">Question:</label>
+          <input type="text" id="question" placeholder="Enter the question to cache..." />
+        </div>
+        <div class="form-group">
+          <label for="response">Response (optional - will generate if empty):</label>
+          <textarea
+            id="response"
+            placeholder="Enter the response or leave empty to generate automatically..."
+          ></textarea>
+        </div>
+        <button onclick="addCacheEntry()" class="success">➕ Add Entry</button>
+      </div>
+
+      <!-- Cache Entries -->
+      <div class="section">
+        <h2>📋 Cache Entries</h2>
+        <div class="search-controls">
+          <input
+            type="text"
+            id="entry-search"
+            placeholder="Search questions..."
+            onkeyup="filterEntries()"
+            style="flex: 1; margin-right: 10px"
+          />
+          <button onclick="clearSearch()" class="secondary">Clear</button>
+        </div>
+        <div class="loading" id="entries-loading">Loading cache entries...</div>
+        <div id="cache-entries" class="cache-entries"></div>
+        <div class="entry-controls">
+          <button onclick="loadCacheEntries()" class="success">🔄 Refresh Entries</button>
+          <button onclick="expandAllEntries()" class="info">📖 Expand All</button>
+          <button onclick="collapseAllEntries()" class="secondary">📚 Collapse All</button>
+        </div>
+      </div>
+
+      <!-- Bulk Operations -->
+      <div class="section">
+        <h2>⚡ Bulk Operations</h2>
+        <button onclick="regenerateAllCache()" class="warning">🔄 Regenerate All Cache</button>
+        <button
+          onclick="updateCacheModels()"
+          class="info"
+          title="Update all cache entries without model information to use the current model"
+        >
+          🤖 Update Model Info
+        </button>
+        <button onclick="clearAllCache()" class="danger">🗑️ Clear All Cache</button>
+      </div>
+
+      <div class="section">
+        <h2>🔐 Account</h2>
+        <button onclick="logout()" class="danger">🚪 Logout</button>
+      </div>
+    </div>
+
+    <!-- Response Modal -->
+    <div id="response-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-question">Question</h3>
+          <button onclick="closeResponseModal()" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="response-content" id="modal-response"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Response Modal -->
+    <div id="edit-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="edit-modal-question">Edit Response</h3>
+          <button onclick="closeEditModal()" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="edit-form">
+            <label for="edit-response-text">Response Text:</label>
+            <textarea
+              id="edit-response-text"
+              rows="15"
+              placeholder="Edit the response text here..."
+            ></textarea>
+            <div class="edit-actions">
+              <button onclick="saveEditedResponse()" class="success">💾 Save Changes</button>
+              <button onclick="closeEditModal()" class="secondary">❌ Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Base64 encoding for Basic Auth
+      function encodeBase64(str) {
+        return window.btoa(unescape(encodeURIComponent(str)));
+      }
+
+      // Get admin credentials from sessionStorage (set by login form)
+      function getAdminCredentials() {
+        const username = sessionStorage.getItem('cache_admin_username');
+        const password = sessionStorage.getItem('cache_admin_password');
+
+        console.log('🔍 Checking credentials:', {
+          username: username ? 'SET' : 'NOT SET',
+          password: password ? 'SET' : 'NOT SET',
+        });
+
+        if (!username || !password) {
+          console.log('❌ No credentials found, redirecting to login');
+          // Redirect to login if no credentials
+          window.location.href = '/cache/login';
+          return null;
+        }
+
+        console.log('✅ Credentials found');
+        return { username, password };
+      }
+
+      // Check if we're authenticated by checking credentials exist
+      function checkAuthentication() {
+        const creds = getAdminCredentials();
+        if (!creds) {
+          console.log('❌ No credentials found, redirecting to login');
+          window.location.href = '/cache/login';
+          return false;
+        }
+
+        console.log('✅ Credentials found, proceeding with authenticated requests');
+        return true;
+      }
+
+      // API base URL
+      const API_BASE = window.location.origin;
+
+      // Headers for authentication
+      function getAuthHeaders() {
+        const creds = getAdminCredentials();
+        if (!creds) return null;
+
+        const credentials = encodeBase64(`${creds.username}:${creds.password}`);
+        console.log('🔐 Creating auth headers with credentials');
+
+        return {
+          Authorization: `Basic ${credentials}`,
+          'Content-Type': 'application/json',
+        };
+      }
+
+      // Show status message
+      function showStatus(message, type = 'info') {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = 'block';
+
+        setTimeout(() => {
+          status.style.display = 'none';
+        }, 5000);
+      }
+
+      // Handle authentication errors
+      function handleAuthError(error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          showStatus('Authentication failed. Redirecting to login...', 'error');
+          setTimeout(() => {
+            window.location.href = '/cache/login';
+          }, 2000);
+          return true;
+        }
+        return false;
+      }
+
+      // Load cache status
+      async function loadCacheStatus() {
+        console.log('🔄 Loading cache status...');
+        try {
+          const response = await fetch(`${API_BASE}/cache/status`, {
+            headers: getAuthHeaders(),
+          });
+
+          console.log('📊 Cache status response:', response.status);
+          const data = await response.json();
+          console.log('📊 Cache status data:', data);
+
+          if (data.success) {
+            document.getElementById('total-entries').textContent = data.data.total_entries;
+            document.getElementById('cache-size').textContent = formatBytes(
+              data.data.cache_file_size
+            );
+            document.getElementById('cache-status').textContent = data.data.cache_file_exists
+              ? 'Active'
+              : 'No Cache';
+
+            // Display model distribution
+            const modelDist = data.data.model_distribution || {};
+            if (Object.keys(modelDist).length > 0) {
+              const distText = Object.entries(modelDist)
+                .map(([model, count]) => `${model}: ${count}`)
+                .join(', ');
+              document.getElementById('model-distribution').textContent = distText;
+            } else {
+              document.getElementById('model-distribution').textContent = 'No data';
+            }
+          } else {
+            console.log('❌ Cache status failed:', data.message);
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          console.log('❌ Cache status error:', error);
+          if (!handleAuthError(error)) {
+            showStatus(`Error loading cache status: ${error.message}`, 'error');
+          }
+        }
+
+        // Load current model info
+        try {
+          const modelResponse = await fetch(`${API_BASE}/cache/model-info`);
+          const modelData = await modelResponse.json();
+
+          if (modelData.success) {
+            document.getElementById('current-model').textContent = modelData.data.model;
+          } else {
+            document.getElementById('current-model').textContent = 'Unknown';
+          }
+        } catch (error) {
+          console.log('⚠️ Could not fetch model info:', error);
+          document.getElementById('current-model').textContent = 'Unknown';
+        }
+      }
+
+      // Toggle cache entry expand/collapse
+      function toggleCacheEntry(index) {
+        const entries = document.querySelectorAll('.cache-entry');
+        const entry = entries[index];
+        const toggleBtn = entry.querySelector('.cache-entry-toggle');
+
+        if (entry.classList.contains('collapsed')) {
+          entry.classList.remove('collapsed');
+          toggleBtn.textContent = '🔽 Collapse';
+        } else {
+          entry.classList.add('collapsed');
+          toggleBtn.textContent = '▶️ Expand';
+        }
+      }
+
+      // Expand all cache entries
+      function expandAllEntries() {
+        const entries = document.querySelectorAll('.cache-entry');
+        entries.forEach((entry, index) => {
+          if (entry.classList.contains('collapsed')) {
+            toggleCacheEntry(index);
+          }
+        });
+      }
+
+      // Collapse all cache entries
+      function collapseAllEntries() {
+        const entries = document.querySelectorAll('.cache-entry');
+        entries.forEach((entry, index) => {
+          if (!entry.classList.contains('collapsed')) {
+            toggleCacheEntry(index);
+          }
+        });
+      }
+
+      // Filter cache entries by search term
+      function filterEntries() {
+        const searchTerm = document.getElementById('entry-search').value.toLowerCase();
+        const entries = document.querySelectorAll('.cache-entry');
+
+        entries.forEach((entry) => {
+          const question = entry.querySelector('.cache-entry-title').textContent.toLowerCase();
+          if (question.includes(searchTerm)) {
+            entry.classList.remove('hidden');
+          } else {
+            entry.classList.add('hidden');
+          }
+        });
+      }
+
+      // Clear search and show all entries
+      function clearSearch() {
+        document.getElementById('entry-search').value = '';
+        const entries = document.querySelectorAll('.cache-entry');
+        entries.forEach((entry) => {
+          entry.classList.remove('hidden');
+        });
+      }
+
+      // Load cache entries
+      async function loadCacheEntries() {
+        console.log('🔄 Loading cache entries...');
+        const loading = document.getElementById('entries-loading');
+        const entriesContainer = document.getElementById('cache-entries');
+
+        loading.classList.add('show');
+        entriesContainer.innerHTML = '';
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/entries`, {
+            headers: getAuthHeaders(),
+          });
+
+          console.log('📋 Cache entries response:', response.status);
+          const data = await response.json();
+
+          if (data.success) {
+            if (data.data.entries.length === 0) {
+              entriesContainer.innerHTML =
+                '<p style="text-align: center; color: rgba(255,255,255,0.6);">No cache entries found</p>';
+            } else {
+              data.data.entries.forEach((entry, index) => {
+                const entryDiv = document.createElement('div');
+                entryDiv.className = 'cache-entry collapsed';
+                entryDiv.innerHTML = `
+                  <div class="cache-entry-header" onclick="toggleCacheEntry(${index})">
+                    <h3 class="cache-entry-title">${entry.question}</h3>
+                    <button class="cache-entry-toggle" onclick="event.stopPropagation(); toggleCacheEntry(${index})">
+                      ▶️ Expand
+                    </button>
+                  </div>
+                  <div class="cache-entry-details">
+                    <p><strong>Response Length:</strong> ${entry.response.length} characters</p>
+                    <p><strong>Hit Count:</strong> ${entry.hit_count}</p>
+                    <div class="model-info">
+                      <strong>🤖 Model:</strong> ${entry.model || 'unknown'}
+                    </div>
+                    <p><strong>Created:</strong> ${new Date(entry.timestamp).toLocaleString()}</p>
+                    <div class="actions">
+                      <button onclick="viewResponse('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}', '${entry.response
+                  .replace(/'/g, "\\'")
+                  .replace(/\n/g, '\\n')}')" class="info">👁️ View Response</button>
+                      <button onclick="editResponse('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}', '${entry.response
+                  .replace(/'/g, "\\'")
+                  .replace(/\n/g, '\\n')}')" class="secondary">✏️ Edit Response</button>
+                      <button onclick="toggleTTS('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}')" class="primary" id="tts-btn-${entry.question.replace(
+                  /[^a-zA-Z0-9]/g,
+                  '_'
+                )}">🔊 Listen TTS</button>
+                      <button onclick="regenerateEntry('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}')" class="warning">🔄 Regenerate</button>
+                      <button onclick="regenerateTTS('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}')" class="success">🎤 Regenerate TTS</button>
+                      <button onclick="removeEntry('${entry.question.replace(
+                        /'/g,
+                        "\\'"
+                      )}')" class="danger">🗑️ Remove</button>
+                    </div>
+                  </div>
+                `;
+                entriesContainer.appendChild(entryDiv);
+              });
+            }
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error loading cache entries: ${error.message}`, 'error');
+        } finally {
+          loading.classList.remove('show');
+        }
+      }
+
+      // Add cache entry
+      async function addCacheEntry() {
+        const question = document.getElementById('question').value.trim();
+        const responseText = document.getElementById('response').value.trim();
+
+        if (!question) {
+          showStatus('Please enter a question', 'error');
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/add`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              question: question,
+              response: responseText || null,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            document.getElementById('question').value = '';
+            document.getElementById('response').value = '';
+            loadCacheStatus();
+            loadCacheEntries();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error adding cache entry: ${error.message}`, 'error');
+        }
+      }
+
+      // Remove cache entry
+      async function removeEntry(question) {
+        if (!confirm(`Are you sure you want to remove the cache entry for: "${question}"?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/remove`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ question: question }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            loadCacheStatus();
+            loadCacheEntries();
+            loadCacheStats();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error removing cache entry: ${error.message}`, 'error');
+        }
+      }
+
+      // Regenerate cache entry
+      async function regenerateEntry(question) {
+        if (!confirm(`Are you sure you want to regenerate the cache entry for: "${question}"?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/regenerate`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ question: question }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            loadCacheEntries();
+            loadCacheStats();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error regenerating cache entry: ${error.message}`, 'error');
+        }
+      }
+
+      // Global audio storage
+      let currentAudio = null;
+      let currentQuestion = null;
+
+      // Toggle TTS for cache entry (play/stop)
+      async function toggleTTS(question) {
+        const buttonId = `tts-btn-${question.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const button = document.getElementById(buttonId);
+
+        // If audio is currently playing for this question, stop it
+        if (currentAudio && currentQuestion === question && !currentAudio.paused) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+          currentAudio = null;
+          currentQuestion = null;
+          button.innerHTML = '🔊 Listen TTS';
+          button.className = 'primary';
+          showStatus('TTS audio stopped', 'info');
+          return;
+        }
+
+        // If different audio is playing, stop it first
+        if (currentAudio && currentQuestion !== question) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+          const prevButtonId = `tts-btn-${currentQuestion.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const prevButton = document.getElementById(prevButtonId);
+          if (prevButton) {
+            prevButton.innerHTML = '🔊 Listen TTS';
+            prevButton.className = 'primary';
+          }
+        }
+
+        try {
+          showStatus('Generating TTS audio...', 'info');
+          button.innerHTML = '⏳ Generating...';
+          button.className = 'warning';
+
+          const response = await fetch(`${API_BASE}/cache/listen-tts`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ question: question }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            // Create audio element and play the TTS
+            currentAudio = new Audio(`data:audio/wav;base64,${data.data.audio}`);
+            currentQuestion = question;
+
+            // Update button to show stop state
+            button.innerHTML = '⏹️ Stop TTS';
+            button.className = 'danger';
+
+            // Add event listeners for when audio ends
+            currentAudio.addEventListener('ended', () => {
+              currentAudio = null;
+              currentQuestion = null;
+              button.innerHTML = '🔊 Listen TTS';
+              button.className = 'primary';
+              showStatus('TTS audio finished', 'info');
+            });
+
+            currentAudio.addEventListener('error', () => {
+              currentAudio = null;
+              currentQuestion = null;
+              button.innerHTML = '🔊 Listen TTS';
+              button.className = 'primary';
+              showStatus('TTS audio error', 'error');
+            });
+
+            currentAudio.play();
+            showStatus('Playing TTS audio...', 'success');
+          } else {
+            button.innerHTML = '🔊 Listen TTS';
+            button.className = 'primary';
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          button.innerHTML = '🔊 Listen TTS';
+          button.className = 'primary';
+          showStatus(`Error playing TTS: ${error.message}`, 'error');
+        }
+      }
+
+      // Regenerate TTS for cache entry
+      async function regenerateTTS(question) {
+        if (!confirm(`Are you sure you want to regenerate the TTS audio for: "${question}"?`)) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/regenerate-tts`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ question: question }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error regenerating TTS: ${error.message}`, 'error');
+        }
+      }
+
+      // Regenerate all cache
+      async function regenerateAllCache() {
+        if (
+          !confirm('Are you sure you want to regenerate ALL cache entries? This may take a while.')
+        ) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/regenerate-all`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            loadCacheStatus();
+            loadCacheEntries();
+            loadCacheStats();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error regenerating all cache: ${error.message}`, 'error');
+        }
+      }
+
+      // Update cache models
+      async function updateCacheModels() {
+        if (
+          !confirm(
+            "This will update all cache entries that don't have model information with the current model. Continue?"
+          )
+        ) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/update-model`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            loadCacheStatus();
+            loadCacheEntries();
+            loadCacheStats();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error updating cache models: ${error.message}`, 'error');
+        }
+      }
+
+      // Clear all cache
+      async function clearAllCache() {
+        if (
+          !confirm(
+            'Are you sure you want to clear ALL cache entries? This action cannot be undone.'
+          )
+        ) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/cache/clear`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus(data.message, 'success');
+            loadCacheStatus();
+            loadCacheEntries();
+            loadCacheStats();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error clearing cache: ${error.message}`, 'error');
+        }
+      }
+
+      // Load cache statistics
+      async function loadCacheStats() {
+        console.log('🔄 Loading cache stats...');
+        try {
+          const response = await fetch(`${API_BASE}/cache/status`, {
+            headers: getAuthHeaders(),
+          });
+
+          console.log('📈 Cache stats response:', response.status);
+          const data = await response.json();
+
+          if (data.success) {
+            const cacheData = data.data;
+
+            // Calculate statistics
+            const totalEntries = cacheData.total_entries || 0;
+            const totalHits = cacheData.total_hits || 0;
+            const totalMisses = cacheData.total_misses || 0;
+            const hitRate =
+              totalHits + totalMisses > 0
+                ? ((totalHits / (totalHits + totalMisses)) * 100).toFixed(1) + '%'
+                : '0%';
+
+            // Estimate memory saved (rough calculation)
+            const avgResponseSize = 500; // characters
+            const memorySaved = totalHits * avgResponseSize;
+
+            // Update UI
+            document.getElementById('hit-rate').textContent = hitRate;
+            document.getElementById('total-hits').textContent = totalHits;
+            document.getElementById('total-misses').textContent = totalMisses;
+            document.getElementById('memory-saved').textContent = formatBytes(memorySaved);
+
+            // Load recent activity
+            loadRecentActivity();
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error loading cache stats: ${error.message}`, 'error');
+        }
+      }
+
+      // Load recent activity
+      async function loadRecentActivity() {
+        try {
+          const response = await fetch(`${API_BASE}/cache/entries`, {
+            headers: getAuthHeaders(),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            const activityLog = document.getElementById('recent-activity');
+            const entries = data.data.entries || [];
+
+            // Sort by timestamp (most recent first)
+            entries.sort((a, b) => b.timestamp - a.timestamp);
+
+            // Show last 10 entries
+            const recentEntries = entries.slice(0, 10);
+
+            activityLog.innerHTML = recentEntries
+              .map((entry, index) => {
+                const date = new Date(entry.timestamp).toLocaleString();
+                const hitCount = entry.hit_count || 0;
+                const hasResponse = entry.response && entry.response.trim().length > 0;
+                const activityClass = hasResponse ? 'activity-hit' : 'activity-add';
+                const activityText = hasResponse
+                  ? `Generated (${hitCount}x): ${entry.question.substring(0, 50)}...`
+                  : `Added: ${entry.question.substring(0, 50)}...`;
+
+                const responsePreview = entry.response
+                  ? entry.response.substring(0, 200) + (entry.response.length > 200 ? '...' : '')
+                  : 'No response content';
+
+                return `<div class="activity-item ${activityClass}" onclick="toggleResponse(${index})">
+                  <div class="activity-header">
+                    <span>${date}</span> - ${activityText}
+                  </div>
+                  <div class="response-preview" id="response-${index}">
+                    <strong>Response:</strong><br>
+                    ${responsePreview}
+                  </div>
+                </div>`;
+              })
+              .join('');
+
+            if (recentEntries.length === 0) {
+              activityLog.innerHTML = '<div class="activity-item">No recent activity</div>';
+            }
+
+            console.log('📊 Recent activity loaded:', recentEntries.length, 'entries');
+            console.log('📊 Activity entries:', recentEntries);
+          }
+        } catch (error) {
+          console.error('Error loading recent activity:', error);
+        }
+      }
+
+      // Toggle response preview
+      function toggleResponse(index) {
+        const responseElement = document.getElementById(`response-${index}`);
+        const activityItem = responseElement.parentElement;
+
+        if (responseElement.classList.contains('show')) {
+          responseElement.classList.remove('show');
+          activityItem.classList.remove('expanded');
+        } else {
+          // Close all other expanded responses
+          document.querySelectorAll('.response-preview.show').forEach((el) => {
+            el.classList.remove('show');
+            el.parentElement.classList.remove('expanded');
+          });
+
+          // Open this response
+          responseElement.classList.add('show');
+          activityItem.classList.add('expanded');
+        }
+      }
+
+      // View response in modal
+      function viewResponse(question, response) {
+        const modal = document.getElementById('response-modal');
+        const questionElement = document.getElementById('modal-question');
+        const responseElement = document.getElementById('modal-response');
+
+        questionElement.textContent = question;
+        responseElement.textContent = response.replace(/\\n/g, '\n');
+
+        modal.style.display = 'block';
+
+        // Close modal when clicking outside
+        modal.onclick = function (event) {
+          if (event.target === modal) {
+            closeResponseModal();
+          }
+        };
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            closeResponseModal();
+          }
+        });
+      }
+
+      // Close response modal
+      function closeResponseModal() {
+        const modal = document.getElementById('response-modal');
+        modal.style.display = 'none';
+      }
+
+      // Global variable to store current question being edited
+      let currentEditingQuestion = null;
+
+      // Edit response in modal
+      function editResponse(question, response) {
+        currentEditingQuestion = question;
+
+        const modal = document.getElementById('edit-modal');
+        const questionElement = document.getElementById('edit-modal-question');
+        const responseTextarea = document.getElementById('edit-response-text');
+
+        questionElement.textContent = `Edit Response: ${question}`;
+        responseTextarea.value = response.replace(/\\n/g, '\n');
+
+        modal.style.display = 'block';
+
+        // Close modal when clicking outside
+        modal.onclick = function (event) {
+          if (event.target === modal) {
+            closeEditModal();
+          }
+        };
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            closeEditModal();
+          }
+        });
+      }
+
+      // Close edit modal
+      function closeEditModal() {
+        const modal = document.getElementById('edit-modal');
+        modal.style.display = 'none';
+        currentEditingQuestion = null;
+      }
+
+      // Save edited response
+      async function saveEditedResponse() {
+        if (!currentEditingQuestion) {
+          showStatus('No question selected for editing', 'error');
+          return;
+        }
+
+        const newResponse = document.getElementById('edit-response-text').value.trim();
+
+        if (!newResponse) {
+          showStatus('Response text cannot be empty', 'error');
+          return;
+        }
+
+        try {
+          showStatus('Saving changes...', 'info');
+
+          const response = await fetch(`${API_BASE}/cache/update`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              question: currentEditingQuestion,
+              response: newResponse,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showStatus('Response updated successfully!', 'success');
+            closeEditModal();
+            loadCacheEntries(); // Refresh the list
+
+            // Notify the main chat page to sync its cache
+            if (window.opener && window.opener.syncFrontendCache) {
+              window.opener.syncFrontendCache();
+            }
+          } else {
+            showStatus(data.message, 'error');
+          }
+        } catch (error) {
+          showStatus(`Error updating response: ${error.message}`, 'error');
+        }
+      }
+
+      // Format bytes
+      function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+
+      // Logout function
+      function logout() {
+        if (confirm('Are you sure you want to logout?')) {
+          sessionStorage.removeItem('cache_admin_username');
+          sessionStorage.removeItem('cache_admin_password');
+          window.location.href = '/cache/login';
+        }
+      }
+
+      // Load initial data
+      document.addEventListener('DOMContentLoaded', function () {
+        // Check authentication first
+        const isAuthenticated = checkAuthentication();
+        if (!isAuthenticated) {
+          return; // Will redirect to login
+        }
+
+        // Test authentication with a simple call first
+        console.log('🧪 Testing authentication...');
+        fetch('/cache/status', {
+          headers: getAuthHeaders(),
+        })
+          .then((response) => {
+            console.log('🧪 Auth test response:', response.status, response.statusText);
+            if (response.ok) {
+              console.log('✅ Authentication test passed, loading data...');
+              // Load data if authenticated
+              loadCacheStatus();
+              loadCacheEntries();
+              loadCacheStats();
+            } else {
+              console.log('❌ Authentication test failed');
+              showStatus('Authentication failed. Please log in again.', 'error');
+              setTimeout(() => {
+                window.location.href = '/cache/login';
+              }, 2000);
+            }
+          })
+          .catch((error) => {
+            console.log('❌ Authentication test error:', error);
+            showStatus('Connection error. Please try again.', 'error');
+          });
+      });
+    </script>
+  </body>
+</html>

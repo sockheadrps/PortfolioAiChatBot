@@ -1,0 +1,48 @@
+{
+  "name": "Ryan Skiles Professional Profile",
+  "type": "professional",
+  "description": "You're a detaildriven problemsolver who bridges heavy industry and cuttingedge softwareand you love helping others learn along the way. On the industrial side, you've spent 12 years as a commercial & datacenter electricianretrofitting servo presses, managing redundant power systems (ATS, inverters, generators) at Google/AWS scale, and structuring Excel trackers for QA logging. On the software side, you build embedded firmware (ESP32, ATmega), Rust libraries via PyO3/Maturin, and Python backends (FastAPI WebSockets with JWT/E2EE). You've created realtime chat apps, local LLM assistants, testnet Bitcoin tools, data visualizations (Matplotlib, Plotly), Chrome extensions, Twitch overlays, and Minecraft mods with dynamic NBT spellbooks. You deploy fullstack apps behind Nginx/DuckDNS with Supabase auth and automate CI/CD via GitHub Actions. You also engineer AI/ML solutionsfrom palindrome classifiers (LSTM/GRU/Transformer) to TTS training with PyTorch Lightningalways simplifying complexity with clean, maintainable code. Beyond building products, you're passionate about sharing knowledge: you produce YouTube tutorials, stream on Twitch, mentor newer streamers and developers, and answer questions across Reddit communities.",
+  "skills": [
+    "Power System Design & Redundancy",
+    "Commercial & Data Center Electrical Systems",
+    "QA Tracking & Excel Automation",
+    "Embedded Systems Programming (ESP32, ATmega)",
+    "Rust ↔ Python Integration (PyO3, Maturin)",
+    "Python Backend (FastAPI, WebSockets)",
+    "JWT Authentication & End to End Encryption",
+    "Front End (Svelte, React, WebSocket UIs)",
+    "CI/CD Pipelines (GitHub Actions)",
+    "Server Deployment (Nginx, DuckDNS, Supabase)",
+    "AI/ML Model Development (LSTM, GRU, Transformers)",
+    "Data Visualization (Matplotlib, Plotly)",
+    "Chrome Extension Development",
+    "Twitch Overlay & UI Injection",
+    "Minecraft Modding (Fabric, NBT)",
+    "Blockchain & Bitcoin Testnet Tools",
+    "Content Creation & Instruction",
+    "Community Engagement & Mentorship",
+    "Streaming & Video Production"
+  ],
+  "code_url": "",
+  "image": "/assets/profile/ryanskiles",
+  "youtube_tutorials": [
+    "https://youtu.be/olWPT9V6tuw",
+    "https://youtu.be/wIbybhfvkVE",
+    "https://youtu.be/wgontWHx4jw"
+  ],
+  "notes": [
+    "12 years as a commercial & datacenter electrician, retrofitting servo presses and managing ATS, inverters, and generators.",
+    "Structured Excelbased QA trackers for ongoing construction and powersystem audits.",
+    "Handcrafted embedded firmware for ESP32/ATmega modules, including custom sensor I/O and control loops.",
+    "Developed Rust libraries with PyO3/Maturin and integrated them into Python applications.",
+    "Built FastAPI WebSocket backends with JWT auth and endtoend encrypted private messaging.",
+    "Created realtime WebSocket UIs in Svelte and React for chat apps, LLM assistants, and live data dashboards.",
+    "Engineered testnet Bitcoin tools in Python and simulated transactions for development.",
+    "Automated CI/CD pipelines using GitHub Actions for testing, building, and deploying services.",
+    "Designed AI/ML solutions: palindrome classifiers (LSTM/GRU/Transformer) and custom TTS training with PyTorch Lightning.",
+    "Authored Chrome extensions for UI injection and crafted Twitch overlay systems.",
+    "Implemented a Fabricbased Minecraft mod with dynamic NBT spellbook mechanics.",
+    "Deployed fullstack applications behind Nginx reverse proxies with DuckDNS and integrated Supabase authentication.",
+    "Produce educational content: YouTube tutorials, Twitch streams, and Reddit Q&A-mentoring newer streamers and developers."
+  ]
+}

@@ -1,116 +1,124 @@
-[{
-  "name": "FastAPI WebSocket Chat App",
-  "description": "A modern real-time chat application built with FastAPI, WebSockets, SQLite, and vanilla JS, with full authentication and dynamic user interactions.",
-  "type": "software",
-  "skills": [
-    "FastAPI",
-    "WebSockets",
-    "Authentication",
-    "SQLite",
-    "JWT",
-    "Passlib",
-    "Bcrypt",
-    "RSA",
-    "Pydantic",
-    "Jinja2",
-    "SQLAlchemy",
-    "JavaScript"
-  ],
-  "code_url": "https://github.com/sockheadrps/websocketchat",  
-  "notes": [
-    "Implemented token-based authentication using JWT and secure cookies.",
-    "Encrypted private messages using RSA-OAEP end-to-end encryption.",
-    "Used FastAPI and WebSocket for real-time communication between clients.",
-    "Designed modular structure with separate auth, chat, and utility components.",
-    "Handled message validation and serialization with Pydantic.",
-    "Integrated Jinja2 for rendering templates and vanilla JS for frontend logic."
-  ]
-},
+[
+  {
+    "name": "FastAPI WebSocket Chat App",
+    "description": "A modern real-time chat application built with FastAPI, WebSockets, SQLite, and vanilla JS, with full authentication and dynamic user interactions.",
+    "type": "software",
+    "skills": [
+      "FastAPI",
+      "WebSockets",
+      "Authentication",
+      "SQLite",
+      "JWT",
+      "Passlib",
+      "Bcrypt",
+      "RSA",
+      "Pydantic",
+      "Jinja2",
+      "SQLAlchemy",
+      "JavaScript"
+    ],
+    "code_url": "https://github.com/sockheadrps/websocketchat",
+    "notes": [
+      "Implemented token-based authentication using JWT and secure cookies.",
+      "Encrypted private messages using RSA-OAEP end-to-end encryption.",
+      "Used FastAPI and WebSocket for real-time communication between clients.",
+      "Designed modular structure with separate auth, chat, and utility components.",
+      "Handled message validation and serialization with Pydantic.",
+      "Integrated Jinja2 for rendering templates and vanilla JS for frontend logic."
+    ]
+  },
 
-{
-  "name": "Palindrome Detection",
-  "description": "Built a custom NLP pipeline to classify palindromes with 99.88% accuracy using progressively refined models (LSTM → GRU → Transformer). Augmented the dataset with contrastive examples including near-palindromes and deceptive symmetric patterns. Also configured and trained an open-source voice cloning toolchain tailored for livestream integration.",
-  "type": "software",
-  "skills": [
-    "Python",
-    "NLP",
-    "TensorFlow/Keras",
-    "LSTM",
-    "GRU",
-    "Transformer",
-    "Data Augmentation",
-    "Model Training",
-    "Contrastive Examples",
-    "Active Learning",
-    "Automation"
-  ],
-  "code_url": "https://github.com/sockheadrps/PalindromeTransformerClassifier",
-  "notes": [
-    "Implemented a data generator that creates real, near, and deceptive non-palindromes using symmetry-breaking rules.",
-    "Used `make_double_letter_non_palindrome` to create examples with repeated letters, which the model struggled with early on.",
-    "Added `make_partial_mirror_non_palindrome` and `make_symetrical_non_palindrome` to confuse symmetry-biased classifiers.",
-    "Moved from LSTM to GRU to Transformer architectures for faster training and better generalization.",
-    "Final model misclassified only 1 out of 800 curated examples.",
-    "Automatically retrains the model using high-confidence false positives from test runs, logging them to `hard_negatives.txt` and injecting them into the dataset on next startup.",
-    "This retraining loop acts as a feedback mechanism to continuously harden the classifier against edge cases."
-  ]
-},
-{
-  "name": "rpaudio",
-  "description": "RPAudio is a rust-based Python library for non-blocking audio playback with a simple and intuitive API. Designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.",
-  "type": "software",
-  "skills": [
-    "Rust",
-    "Python",
-    "PyO3",
-    "Concurrency",
-    "AsyncIO",
-    "Audio Processing",
-    "Threading",
-    "FFmpeg",
-    "Library Design",
-    "Cross-Platform"
-  ],
-  "code_url": "https://github.com/sockheadrps/rpaudio",
-  "notes": [
-  "I created rpaudio to bridge Rust’s performance and concurrency guarantees with Python’s ease of use, especially in async applications.",
-  "It offers non-blocking audio playback via `AudioSink`, dynamic audio effect processing through `AudioChannel`, and multi-channel coordination with `ChannelManager`.",
-  "Supports audio formats including MP3, WAV, FLAC, and Vorbis.",
-  "Exposes a clean Python API for both playback control and metadata access.",
-  "Designed to simplify integration compared to PyAudio, while avoiding blocking the main thread.",
-  "Ideal for responsive and real-time Python applications requiring audio control."
+  {
+    "name": "Palindrome Detection",
+    "description": "Built a custom NLP pipeline to classify palindromes with 99.88% accuracy using progressively refined models (LSTM → GRU → Transformer). Augmented the dataset with contrastive examples including near-palindromes and deceptive symmetric patterns. Also configured and trained an open-source voice cloning toolchain tailored for livestream integration.",
+    "type": "software",
+    "skills": [
+      "Python",
+      "NLP",
+      "TensorFlow/Keras",
+      "LSTM",
+      "GRU",
+      "Transformer",
+      "Data Augmentation",
+      "Model Training",
+      "Contrastive Examples",
+      "Active Learning",
+      "Automation"
+    ],
+    "code_url": "https://github.com/sockheadrps/PalindromeTransformerClassifier",
+    "notes": [
+      "Implemented a data generator that creates real, near, and deceptive non-palindromes using symmetry-breaking rules.",
+      "Used `make_double_letter_non_palindrome` to create examples with repeated letters, which the model struggled with early on.",
+      "Added `make_partial_mirror_non_palindrome` and `make_symetrical_non_palindrome` to confuse symmetry-biased classifiers.",
+      "Moved from LSTM to GRU to Transformer architectures for faster training and better generalization.",
+      "Final model misclassified only 1 out of 800 curated examples.",
+      "Automatically retrains the model using high-confidence false positives from test runs, logging them to `hard_negatives.txt` and injecting them into the dataset on next startup.",
+      "This retraining loop acts as a feedback mechanism to continuously harden the classifier against edge cases."
+    ]
+  },
+  {
+    "name": "rpaudio",
+    "description": "RPAudio is a rust-based Python library for non-blocking audio playback with a simple and intuitive API. Designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.",
+    "type": "software",
+    "skills": [
+      "Rust",
+      "Python",
+      "PyO3",
+      "Concurrency",
+      "AsyncIO",
+      "Audio Processing",
+      "Threading",
+      "FFmpeg",
+      "Library Design",
+      "Cross-Platform"
+    ],
+    "code_url": "https://github.com/sockheadrps/rpaudio",
+    "notes": [
+      "I created rpaudio to bridge Rust's performance and concurrency guarantees with Python's ease of use, especially in async applications.",
+      "Audio playback in Python is pretty niche, but is a really fun and interesting way for newer programmers to integrate exciting feature feedback into their projects, but is also a good choice for seasoned projects to consider, if it meets the feature requirements of their existing solutions.",
+      "What It Does:",
+      "Non-blocking Audio Playback: Unlike traditional audio libraries that may block your program's main thread, Rpaudio runs in a non-blocking manner. This means it works seamlessly with Python's async runtimes, allowing you to handle audio in the background without interrupting other tasks.",
+      "Simple and Intuitive API: I wanted to make sure that using Rpaudio is as simple as possible. With just a few lines of code, you can easily load, play, pause, and resume audio. For more complicated needs, it also provides abstractions such as AudioChannel's, which act as a queue manager, and can apply different effects such as fades or speed changes to any AudioSink object played from its queue, and can even apply the effects dynamically, over time.",
+      "Lightweight and Efficient: Built with Rust, Rpaudio brings the performance benefits of a compiled language to Python. This ensures safe and efficient thread handling and memory management.",
+      "Cross-Platform: Rpaudio is designed to work smoothly on Windows, macOS, and Linux.",
+      "It offers non-blocking audio playback via `AudioSink`, dynamic audio effect processing through `AudioChannel`, and multi-channel coordination with `ChannelManager`.",
+      "Supports audio formats including MP3, WAV, FLAC, and Vorbis.",
+      "Exposes a clean Python API for both playback control and metadata access.",
+      "I built this because I wanted a way to use Rust's power in Python projects without having to deal with the usual awkwardness that come with Python's GIL. It's especially useful if you're working on projects that need to handle audio in async applications.",
+      "Why I Think It's Useful:",
+      "During my work with Python and audio, I found that many libraries were either too cumbersome or didn't play well with async applications. Libraries like PyAudio often require dealing with complicated dependencies, and others don't handle concurrency well, leading to blocking calls that mess with async code. Rpaudio was born out of the need for a lightweight, easy-to-use solution that works well with Python's async ecosystem and offers simple, efficient audio control.",
+      "Comparison:",
+      "Pyaudio and other popular libraries like it, dont seem to support async functionality natively, which is one of the ways I normally like to interact with audio since it's naturally just kind of a blocking thing to do. Audio libraries are often more complex than necessary, requiring additional dependencies and setup that just isn't needed if you're working on a simple audio player or sound management tool. Additionally, they don't always work well with async Python applications because they rely on blocking calls or the overhead of larger libraries.",
+      "Designed to simplify integration compared to PyAudio, while avoiding blocking the main thread.",
+      "Ideal for responsive and real-time Python applications requiring audio control."
+    ]
+  },
+  {
+    "name": "PyProfileDataGen",
+    "description": "Automatically enhance your GitHub profile with real-time visual analytics of your Python repositories. This tool runs via GitHub Actions to generate and append statistics and graphs to your README on every push, with no manual updates required.",
+    "type": "software",
+    "skills": [
+      "Python",
+      "GitHub Actions",
+      "Data Visualization",
+      "Plotly",
+      "Pandas",
+      "Matplotlib",
+      "Regex",
+      "GitHub API",
+      "Automation",
+      "Heatmaps",
+      "Word Clouds"
+    ],
+    "code_url": "https://github.com/sockheadrps/PyProfileDataGen",
+    "notes": [
+      "Parses all Python repositories in your GitHub profile to extract detailed metrics such as line counts, constructs used, and libraries imported.",
+      "Generates bar graphs, line charts, heatmaps, and word clouds using Plotly and Matplotlib.",
+      "Visualizations include commit activity by time/day, file type usage, construct counts (loops, functions, control flow, etc.), and recent commits/PRs.",
+      "All charts are compiled into an animated GIF to reduce visual clutter in the README.",
+      "Appends new data at the bottom of your README while preserving the rest of your content.",
+      "Workflow runs automatically through GitHub Actions on every push to the main branch.",
+      "Designed for Python devs who want an automated way to keep their GitHub profile informative and visually appealing without manual updates."
+    ]
+  }
 ]
-
-},
-{
-  "name":   "PyProfileDataGen",
-  "description": "Automatically enhance your GitHub profile with real-time visual analytics of your Python repositories. This tool runs via GitHub Actions to generate and append statistics and graphs to your README on every push, with no manual updates required.",
-  "type": "software",
-  "skills": [
-    "Python",
-    "GitHub Actions",
-    "Data Visualization",
-    "Plotly",
-    "Pandas",
-    "Matplotlib",
-    "Regex",
-    "GitHub API",
-    "Automation",
-    "Heatmaps",
-    "Word Clouds"
-  ],
-  "code_url": "https://github.com/sockheadrps/PyProfileDataGen",
-  "notes": [
-    "Parses all Python repositories in your GitHub profile to extract detailed metrics such as line counts, constructs used, and libraries imported.",
-    "Generates bar graphs, line charts, heatmaps, and word clouds using Plotly and Matplotlib.",
-    "Visualizations include commit activity by time/day, file type usage, construct counts (loops, functions, control flow, etc.), and recent commits/PRs.",
-    "All charts are compiled into an animated GIF to reduce visual clutter in the README.",
-    "Appends new data at the bottom of your README while preserving the rest of your content.",
-    "Workflow runs automatically through GitHub Actions on every push to the main branch.",
-    "Designed for Python devs who want an automated way to keep their GitHub profile informative and visually appealing without manual updates."
-  ]
-}
-
-
-]
-

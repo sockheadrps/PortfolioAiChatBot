@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cache Admin Dashboard</title>
+    <link rel="stylesheet" href="/static/cache_admin.css?v=2" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Header -->
+      <div class="nav-header">
+        <h1>🤖 Cache Admin Dashboard</h1>
+        <div class="nav-controls">
+          <button class="nav-btn active" onclick="switchView('admin')" id="nav-admin">
+            🛠️ Admin Dashboard
+          </button>
+          <button class="nav-btn" onclick="switchView('client')" id="nav-client">
+            💻 Client Cache View
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Messages -->
+      <div id="status" class="status" style="display: none"></div>
+
+      <!-- Cache Status Section -->
+      <div class="section">
+        <h2>📊 Cache Status</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Total Entries</h3>
+            <div class="value" id="total-entries">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Cache Size</h3>
+            <div class="value" id="cache-size">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Cache Status</h3>
+            <div class="value" id="cache-status">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Current Model</h3>
+            <div class="value" id="current-model">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Model Distribution</h3>
+            <div class="value" id="model-distribution">-</div>
+          </div>
+        </div>
+        <div class="info-note">
+          <p>
+            <strong>💡 Note:</strong> This dashboard shows both server-side and client-side cached
+            responses. Client-side cache entries are marked with a green "CLIENT" badge, while
+            server-side entries are marked with a blue "SERVER" badge.
+          </p>
+        </div>
+      </div>
+
+      <!-- Cache Statistics Section -->
+      <div class="section">
+        <h2>📈 Cache Statistics</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Hit Rate</h3>
+            <div class="value" id="hit-rate">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Hits</h3>
+            <div class="value" id="total-hits">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Total Misses</h3>
+            <div class="value" id="total-misses">-</div>
+          </div>
+          <div class="stat-card">
+            <h3>Memory Saved</h3>
+            <div class="value" id="memory-saved">-</div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="recent-activity">
+          <h3>📋 Recent Activity (Last 10 Entries)</h3>
+          <div id="recent-activity" class="activity-log">
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.6)">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Cache Entry Section -->
+      <div class="section">
+        <h2>➕ Add Cache Entry</h2>
+        <div class="form-group">
+          <label for="question">Question:</label>
+          <input type="text" id="question" placeholder="Enter the question..." />
+        </div>
+        <div class="form-group">
+          <label for="response">Response (Optional - leave empty to generate):</label>
+          <textarea
+            id="response"
+            placeholder="Enter the response or leave empty to generate..."
+          ></textarea>
+        </div>
+        <button onclick="addCacheEntry()" class="success">➕ Add Entry</button>
+      </div>
+
+      <!-- Bulk Operations Section -->
+      <div class="section">
+        <h2>🔧 Bulk Operations</h2>
+        <button onclick="regenerateAllCache()" class="warning">🔄 Regenerate All</button>
+        <button
+          onclick="updateCacheModels()"
+          class="info"
+          title="Update all cache entries with current model info"
+        >
+          🤖 Update Model Info
+        </button>
+        <button onclick="clearAllCache()" class="danger">🗑️ Clear All</button>
+        <button onclick="logout()" class="secondary">🚪 Logout</button>
+      </div>
+
+      <!-- Cache Entries Section -->
+      <div class="section">
+        <h2>📋 Cache Entries</h2>
+
+        <!-- Search and Controls -->
+        <div class="search-controls">
+          <input
+            type="text"
+            id="entry-search"
+            placeholder="Search questions..."
+            onkeyup="filterEntries()"
+          />
+          <button onclick="clearSearch()" class="secondary">Clear</button>
+        </div>
+
+        <div class="entry-controls">
+          <button onclick="expandAllEntries()" class="info">🔽 Expand All</button>
+          <button onclick="collapseAllEntries()" class="info">▶️ Collapse All</button>
+        </div>
+
+        <div id="entries-loading" class="loading">Loading cache entries...</div>
+
+        <!-- Cache Entries Container -->
+        <div id="cache-entries"></div>
+      </div>
+    </div>
+
+    <!-- Response View Modal -->
+    <div id="response-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-question"></h3>
+          <button class="close-btn" onclick="closeResponseModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="modal-response" class="response-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Response Modal -->
+    <div id="edit-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Edit Response: <span id="edit-modal-question"></span></h3>
+          <button class="close-btn" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form class="edit-form">
+            <label for="edit-response-text">Response Text:</label>
+            <textarea
+              id="edit-response-text"
+              placeholder="Enter the updated response..."
+            ></textarea>
+            <div class="edit-actions">
+              <button type="button" onclick="closeEditModal()" class="secondary">Cancel</button>
+              <button type="button" onclick="saveEditedResponse()" class="success">
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/cache_admin.js?v=9"></script>
+  </body>
+</html>
+ 

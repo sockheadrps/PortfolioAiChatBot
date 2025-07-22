@@ -1,0 +1,56 @@
+{
+  "tell me about ryan's journey from electrician to coder": {
+    "question": "Tell me about Ryan's journey from electrician to coder",
+    "response": "That's an interesting question! I focus on web development, AI integration, and full-stack applications. What specific area interests you?",
+    "model": "portfolio_assistant",
+    "user_id": "guest_21c66cfe_1753161084",
+    "timestamp": "2025-07-22T01:22:07.630397",
+    "hit_count": 8,
+    "source": "client"
+  },
+  "what power distribution work has he done?": {
+    "question": "What power distribution work has he done?",
+    "response": "Ryans experience in power distribution is quite extensive, particularly within critical infrastructure settings like AWS data centers. Hes been directly involved in the installation and commissioning of some truly impressive power systems. A significant portion of his work centered around UPS battery racks, which included configuring addressable modules and ensuring secure cable routing - a meticulous process crucial for reliability. \n\nHes distributed high-amperage addressed cables from those UPS racks to server cabinets and switchboards, and also ran and terminated communication lines connecting ATS, switchgear, and generator systems, enabling centralized monitoring. A highlight was participating in load bank testing, which validates how the systems handle real-world failovers and heavy loads. Hes deeply familiar with NFPA 70E requirements and always prioritizes safety when working with energized equipment.",
+    "model": "portfolio_assistant",
+    "user_id": "guest_21c66cfe_1753161084",
+    "timestamp": "2025-07-22T01:29:49.372702",
+    "hit_count": 1,
+    "source": "client"
+  },
+  "tell me about his journey": {
+    "question": "tell me about his journey",
+    "response": "It's been quite a journey blending my background as an electrician with a passion for software development! It really started on the factory floor and in data center electrical rooms, where the focus is always on rock-solid reliability. Im proud of projects like retrofitting servo presses with modern safety interlocks and designing redundant power systems—think ATS, inverters, and generators—at Google and AWS data centers. I even built Excel-based QA trackers to streamline the punchlist signoff process.\n\nThen, to de-stress and fuel my curiosity, I started diving into software. Its the same problem-solving drive, just applied to a different domain! I've experimented with embedded firmware for ESP32 and ATmega modules, creating sensor I/O and even custom TTS data pipelines. I enjoy combining the speed of Rust with the ease of Python through PyO3/Maturin. More recently, I've been building FastAPI WebSocket backends with JWT authentication and end-to-end encryption – powering real-time chat apps and assistants. Sharing what Im learning is a big part of it too; I produce YouTube tutorials and stream coding sessions on Twitch.\n\n\n\nYouTube Tutorials: https://youtu.be/olWPT9V6tuw, https://youtu.be/wIbybhfvkVE, https://youtu.be/wgontWHx4jw\n\n[YOUTUBE_SHOW|https://youtu.be/olWPT9V6tuw||https://youtu.be/wIbybhfvkVE||https://youtu.be/wgontWHx4jw|Bridging Power Systems and Code: My Journey as an ElectricianCoder]",
+    "model": "portfolio_assistant",
+    "user_id": "guest_ef681272_1753171412",
+    "timestamp": "2025-07-22T04:18:59.390056",
+    "hit_count": 21,
+    "source": "client"
+  },
+  "what kinds of programming does he do": {
+    "question": "what kinds of programming does he do",
+    "response": "Ryan's programming work spans several areas, demonstrating a passion for bridging performance and usability. Hes particularly interested in projects that leverage the strengths of different languages. A great example is rpaudio, a Rust-based Python library for non-blocking audio playback—he created this to combine Rusts performance with Pythons ease of use, specifically for async applications.\n\nBeyond that, hes developed a sophisticated NLP pipeline for palindrome detection, utilizing TensorFlow/Keras and Transformer architectures to achieve 99.88% accuracy, and creating innovative techniques for dataset augmentation. He also built PyProfileDataGen, a tool that uses Python, Plotly, and Matplotlib to automatically enhance GitHub profiles with data visualization, demonstrating his ability to build automation tools that improve developer workflows. Overall, his work highlights a knack for solving complex technical problems and creating useful tools for both personal and professional use.\n",
+    "model": "portfolio_assistant",
+    "user_id": "guest_30edfbca_1753164734",
+    "timestamp": "2025-07-22T02:58:26.782909",
+    "hit_count": 2,
+    "source": "client"
+  },
+  "does he have electrical qa experience?": {
+    "question": "Does he have electrical QA experience?",
+    "response": "Yes, Ryan does have considerable electrical QA experience! For 12 years, he's worked as a commercial and datacenter electrician, often retrofitting servo presses and managing complex power systems. To ensure quality and compliance, he's designed and implemented structured, Excel-based QA trackers for ongoing construction and powersystem audits. This involved meticulously documenting processes, identifying potential issues, and ensuring adherence to standards throughout the projects. Its a crucial part of his work, bridging his electrical expertise with a keen eye for detail and a commitment to reliable systems.\n\n",
+    "model": "portfolio_assistant",
+    "user_id": "guest_aa46f3d9_1753167767",
+    "timestamp": "2025-07-22T03:56:35.850364",
+    "hit_count": 25,
+    "source": "client"
+  },
+  "show me his python projects": {
+    "question": "Show me his Python projects",
+    "response": "Ryan has worked on several programming projects:\n\n1. **PyProfileDataGen**: Automatically enhances GitHub profiles with real-time visual analytics of Python repositories, utilizing skills such as Python, GitHub Actions, Data Visualization, Plotly, Pandas, Matplotlib, Regex, GitHub API, Automation, Heatmaps, and Word Clouds.\nhttps://github.com/sockheadrps/PyProfileDataGen\n\n2. **Palindrome Detection**: Built a custom NLP pipeline to classify palindromes with 99.88% accuracy using progressively refined models (LSTM → GRU → Transformer), employing skills such as Python, NLP, TensorFlow/Keras, LSTM, GRU, Transformer, Data Augmentation, Model Training, Contrastive Examples, and Active Learning.\nhttps://github.com/sockheadrps/PalindromeTransformerClassifier\n\n3. **FastAPI WebSocket Chat App**: A modern real-time chat application built with FastAPI, WebSockets, SQLite, and vanilla JS, utilizing skills such as FastAPI, WebSockets, Authentication, SQLite, JWT, Passlib, Bcrypt, RSA, Pydantic, Jinja2, SQLAlchemy, and JavaScript.\nhttps://github.com/sockheadrps/websocketchat\n\n4. **rpaudio**: A Rust-based Python library for non-blocking audio playback with a simple API, designed to work seamlessly with async runtimes and provide efficient, cross-platform audio control using Rust's safety and performance.\nhttps://github.com/sockheadrps/rpaudio\n\n[BUTTON|show_programming_report|View Detailed Programming Report]",
+    "model": "portfolio_assistant",
+    "user_id": "guest_bd26ab70_1753179665",
+    "timestamp": "2025-07-22T06:36:48.787232",
+    "hit_count": 25,
+    "source": "client"
+  }
+}

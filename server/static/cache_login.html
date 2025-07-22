@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cache Admin Login</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+      }
+
+      .login-container {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 40px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .login-header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .login-header h1 {
+        margin: 0 0 10px 0;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        font-size: 28px;
+      }
+
+      .login-header p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #e0e0e0;
+        font-size: 14px;
+      }
+
+      input[type='text'],
+      input[type='password'] {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 16px;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+      }
+
+      input[type='text']:focus,
+      input[type='password']:focus {
+        outline: none;
+        border-color: rgba(255, 215, 0, 0.6);
+        box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+      }
+
+      input[type='text']::placeholder,
+      input[type='password']::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .login-btn {
+        width: 100%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 14px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        margin-top: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .login-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .login-btn:active {
+        transform: translateY(0);
+      }
+
+      .login-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .error-message {
+        background: rgba(231, 76, 60, 0.2);
+        border: 1px solid rgba(231, 76, 60, 0.4);
+        color: #e74c3c;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .success-message {
+        background: rgba(39, 174, 96, 0.2);
+        border: 1px solid rgba(39, 174, 96, 0.4);
+        color: #2ecc71;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        color: #ffd700;
+        margin-top: 10px;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .back-link {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.3s ease;
+      }
+
+      .back-link a:hover {
+        color: #ffd700;
+      }
+
+      .password-toggle {
+        position: relative;
+      }
+
+      .password-toggle input {
+        padding-right: 50px;
+      }
+
+      .toggle-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .toggle-btn:hover {
+        color: rgba(255, 255, 255, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-header">
+        <h1>🔧 Cache Admin</h1>
+        <p>Enter your credentials to access the cache management system</p>
+      </div>
+
+      <div id="error-message" class="error-message"></div>
+      <div id="success-message" class="success-message"></div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="Enter your username"
+            required
+            autocomplete="username"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="password-toggle">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+            />
+            <button type="button" class="toggle-btn" onclick="togglePassword()">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn" id="login-btn">🔐 Login</button>
+      </form>
+
+      <div id="loading" class="loading">🔄 Authenticating...</div>
+
+      <div class="back-link">
+        <a href="/">← Back to Chat</a>
+      </div>
+    </div>
+
+    <script>
+      // Toggle password visibility
+      function togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const toggleBtn = document.querySelector('.toggle-btn');
+
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text';
+          toggleBtn.textContent = '🙈';
+        } else {
+          passwordInput.type = 'password';
+          toggleBtn.textContent = '👁️';
+        }
+      }
+
+      // Show error message
+      function showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+
+        // Hide success message if it's showing
+        document.getElementById('success-message').style.display = 'none';
+      }
+
+      // Show success message
+      function showSuccess(message) {
+        const successDiv = document.getElementById('success-message');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+
+        // Hide error message if it's showing
+        document.getElementById('error-message').style.display = 'none';
+      }
+
+      // Handle login form submission
+      async function handleLogin(event) {
+        event.preventDefault();
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const loginBtn = document.getElementById('login-btn');
+        const loading = document.getElementById('loading');
+
+        if (!username || !password) {
+          showError('Please enter both username and password');
+          return;
+        }
+
+        // Show loading state
+        loginBtn.disabled = true;
+        loading.classList.add('show');
+        showError(''); // Clear any previous errors
+
+        try {
+          // Test authentication by trying to access a protected endpoint
+          const response = await fetch('/cache/status', {
+            method: 'GET',
+            headers: {
+              Authorization: 'Basic ' + btoa(username + ':' + password),
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            showSuccess('✅ Authentication successful! Redirecting...');
+
+            // Store credentials in sessionStorage for the admin interface
+            sessionStorage.setItem('cache_admin_username', username);
+            sessionStorage.setItem('cache_admin_password', password);
+
+            console.log('💾 Stored credentials in sessionStorage');
+            console.log('🔍 Stored username:', username);
+            console.log('🔍 Stored password:', password ? 'SET' : 'NOT SET');
+
+            // Redirect to admin interface after a short delay
+            console.log('🔄 Redirecting to admin interface in 1 second...');
+            setTimeout(() => {
+              console.log('🚀 Redirecting now to /cache/admin');
+              window.location.href = '/cache/admin';
+            }, 1000);
+          } else if (response.status === 401) {
+            showError('❌ Invalid username or password. Please try again.');
+          } else if (response.status === 500) {
+            showError('❌ Server configuration error. Please check if admin credentials are set.');
+          } else {
+            showError(`❌ Authentication failed (${response.status}). Please try again.`);
+          }
+        } catch (error) {
+          showError(`❌ Connection error: ${error.message}`);
+        } finally {
+          // Reset loading state
+          loginBtn.disabled = false;
+          loading.classList.remove('show');
+        }
+      }
+
+      // Handle Enter key in password field
+      document.getElementById('password').addEventListener('keypress', function (event) {
+        if (event.key === 'Enter') {
+          handleLogin(event);
+        }
+      });
+
+      // Focus username field on page load
+      document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('username').focus();
+      });
+    </script>
+  </body>
+</html>
+ 

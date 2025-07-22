@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to dismiss a bubble with animation
   function dismissBubble(bubble) {
-    console.log('Dismissing bubble:', bubble); // Debug log
+    // Dismissing bubble
     bubble.style.transition = 'all 0.3s ease-out';
     bubble.style.transform = 'translateY(-20px) scale(0.8)';
     bubble.style.opacity = '0';
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const bubble = e.target.closest('.chat-bubble');
       if (bubble && !touchStartTarget) {
         // Only if not from touch
-        console.log('Bubble clicked:', bubble); // Debug log
+        // Bubble clicked
         dismissBubble(bubble);
       }
     });
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatBubblesContainer.addEventListener('touchstart', (e) => {
       const bubble = e.target.closest('.chat-bubble');
       if (bubble) {
-        console.log('Bubble touchstart:', bubble); // Debug log
+        // Bubble touchstart
         touchStartTime = Date.now();
         touchStartTarget = bubble;
         // Add visual feedback
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatBubblesContainer.addEventListener('touchend', (e) => {
       const bubble = e.target.closest('.chat-bubble');
       if (bubble && touchStartTarget === bubble) {
-        console.log('Bubble touchend:', bubble); // Debug log
+        // Bubble touchend
         const touchDuration = Date.now() - touchStartTime;
 
         // Only dismiss if it was a quick tap (not a long press or scroll)

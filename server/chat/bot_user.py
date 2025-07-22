@@ -47,11 +47,21 @@ class ChatBot:
         self.private_key = None
         self.public_key = None
         self.public_key_pem = None
-        self.user_public_keys: Dict[str, bytes] = {}  # Store other users' public keys
+        # Store other users' public keys
+        self.user_public_keys: Dict[str, bytes] = {}
         
         # Initialize Portfolio Assistant for intelligent responses
-        print(f"🤖 Initializing Optimized Portfolio Assistant for {username}...")
-        self.portfolio_assistant = PortfolioAssistant("server/chat/projects.json")
+        print(
+            f"🤖 Initializing Optimized Portfolio Assistant for {username}...")
+        try:
+            self.portfolio_assistant = PortfolioAssistant(
+                "server/chat/projects.json")
+            print(
+                f"✅ Portfolio Assistant initialized successfully for {username}")
+        except Exception as e:
+            print(f"❌ Error initializing Portfolio Assistant: {e}")
+            print(f"🔄 Portfolio Assistant will use fallback responses")
+            self.portfolio_assistant = None
         
         # Generate RSA key pair for the bot
         self._generate_key_pair()
@@ -102,11 +112,13 @@ class ChatBot:
     def encrypt_message(self, message: str, recipient_username: str) -> str:
         """Encrypt a message for a specific recipient"""
         if recipient_username not in self.user_public_keys:
-            raise ValueError(f"No public key available for {recipient_username}")
+            raise ValueError(
+                f"No public key available for {recipient_username}")
         
         # Import the recipient's public key
         public_key_der = self.user_public_keys[recipient_username]
-        recipient_public_key = serialization.load_der_public_key(public_key_der)
+        recipient_public_key = serialization.load_der_public_key(
+            public_key_der)
         
         # Encrypt the message
         message_bytes = message.encode('utf-8')
@@ -172,14 +184,16 @@ class ChatBot:
         message_lower = message.lower()
         
         # FIRST: Check if portfolio assistant is waiting for input from this user
-        try:
-            user_state = self.portfolio_assistant.get_user_state(user)
-            if user_state.get("awaiting_hobby_choice"):
-                # User is in hobby selection mode, send message directly to portfolio assistant
-                portfolio_response = self.portfolio_assistant.get_response(message, user_id=user)
-                return portfolio_response
-        except Exception as e:
-            print(f"❌ Error checking user state: {e}")
+        if self.portfolio_assistant is not None:
+            try:
+                user_state = self.portfolio_assistant.get_user_state(user)
+                if user_state.get("awaiting_hobby_choice"):
+                    # User is in hobby selection mode, send message directly to portfolio assistant
+                    portfolio_response = self.portfolio_assistant.get_response(
+                        message, user_id=user)
+                    return portfolio_response
+            except Exception as e:
+                print(f"❌ Error checking user state: {e}")
         
         # SECOND: Check if this is a portfolio/technical question
         portfolio_keywords = [
@@ -198,12 +212,16 @@ class ChatBot:
         
         # Use Portfolio Assistant for technical/portfolio questions
         if any(keyword in message_lower for keyword in portfolio_keywords):
-            try:
-                portfolio_response = self.portfolio_assistant.get_response(message, user_id=user)
-                return portfolio_response
-            except Exception as e:
-                print(f"❌ Error getting portfolio response: {e}")
-                # Fall back to general response if portfolio assistant fails
+            if self.portfolio_assistant is not None:
+                try:
+                    portfolio_response = self.portfolio_assistant.get_response(
+                            message, user_id=user)
+                    return portfolio_response
+                except Exception as e:
+                    print(f"❌ Error getting portfolio response: {e}")
+                    # Fall back to general response if portfolio assistant fails
+            else:
+                print(f"🔄 Portfolio Assistant not available, using fallback response")
         
         # Handle general conversation with keyword-based responses
         if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
@@ -228,7 +246,8 @@ class ChatBot:
     
     async def handle_pm_invite(self, from_user: str):
         """Automatically accept all PM invites"""
-        print(f"🤖 {self.username} received PM invite from {from_user} - auto-accepting")
+        print(
+            f"🤖 {self.username} received PM invite from {from_user} - auto-accepting")
         
         # Send acceptance back through the private manager
         accept_msg = PmAcceptMessage(sender=self.username)
@@ -279,7 +298,8 @@ class ChatBot:
                 await self.private_manager.send_to_user(from_user, message)
                 print(f"🤖 {self.username} responded to {from_user}: {response}")
             else:
-                print(f"🤖 No public key available for {from_user}, requesting key first")
+                print(
+                    f"🤖 No public key available for {from_user}, requesting key first")
                 # Request public key and queue the response
                 request_msg = PubkeyRequestMessage(sender=self.username)
                 await self.private_manager.send_to_user(from_user, request_msg)
@@ -300,6 +320,7 @@ class ChatBot:
 # Global bot instance
 chat_bot = None
 
+
 async def initialize_bot(manager: ConnectionManager, private_manager: PrivateConnectionManager):
     """Initialize the global chat bot"""
     global chat_bot
@@ -307,6 +328,7 @@ async def initialize_bot(manager: ConnectionManager, private_manager: PrivateCon
         chat_bot = ChatBot("ChatBot")
         await chat_bot.initialize(manager, private_manager)
     return chat_bot
+
 
 def get_bot() -> ChatBot:
     """Get the global bot instance"""

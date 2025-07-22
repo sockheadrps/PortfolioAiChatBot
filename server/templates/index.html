@@ -35,6 +35,9 @@
         <button id="cancel-username-btn" style="display: none; margin-left: 2px">Cancel</button>
       </div>
       <div class="header-controls">
+        <button id="cache-btn" class="cache-btn" title="Response Cache Manager">
+          <span>📦</span>
+        </button>
         <button id="settings-btn" class="settings-btn" title="Background Settings">
           <span>⚙️</span>
         </button>
@@ -145,6 +148,8 @@
 
     <!-- Toast Notification Container -->
     <div id="toast-container"></div>
+
+    <!-- Cache system removed - no more local storage caching -->
 
     <div class="layout-container">
       <div class="users-toggle" id="users-toggle" title="Hide Users Panel">◀</div>
@@ -581,6 +586,21 @@
           <button id="welcome-next-page" class="btn secondary-btn">Next →</button>
           <button id="welcome-got-it" class="btn welcome-btn">Got it! Let's chat</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Programming Report Modal -->
+    <div id="programming-report-modal" class="modal-overlay hidden">
+      <div class="modal-content programming-report-modal">
+        <div class="modal-header">
+          <h2>🎯 Programming Portfolio Report</h2>
+          <button id="programming-report-close" class="modal-close-btn">&times;</button>
+        </div>
+        <iframe
+          id="programming-report-iframe"
+          src="/static/programming_report.html"
+          frameborder="0"
+        ></iframe>
       </div>
     </div>
 
